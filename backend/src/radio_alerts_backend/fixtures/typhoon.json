@@ -1,0 +1,24 @@
+{
+  "event_id": "TC2631",
+  "number": "2631",
+  "number_label": "台風31号",
+  "name": "IN-FA",
+  "class": "台風(STS)",
+  "location": "マーシャル諸島",
+  "direction": "西北西",
+  "pressure_hpa": 992,
+  "wind_mps": 30,
+  "gust_mps": 45,
+  "lat": 12.5,
+  "lon": 155.0,
+  "areas": [
+    {
+      "code": "130000",
+      "name": "東京都",
+      "prefecture": "東京都",
+      "probability": 55,
+      "window": "2026-10-25T12:00:00Z",
+      "at": "2026-10-25T12:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>気象庁 防災情報</title>
+  <updated>2026-10-25T18:53:04Z</updated>
+  <entry>
+    <title>地震情報</title>
+    <link href="https://www.data.jma.go.jp/developer/xml/data/20261025191740_0_VXSE53_010000.xml" rel="alternate"/>
+    <updated>2026-10-25T18:53:04Z</updated>
+    <id>20261025191740</id>
+  </entry>
+  <entry>
+    <title>台風解析・予報情報（５日予報）（Ｈ３０）</title>
+    <link href="https://www.data.jma.go.jp/developer/xml/data/20261025154310_0_VPTW61_010000.xml" rel="alternate"/>
+    <updated>2026-10-25T15:43:10Z</updated>
+    <id>20261025154310</id>
+  </entry>
+  <entry>
+    <title>台風解析・予報情報（５日予報）（Ｈ３０）</title>
+    <link href="https://www.data.jma.go.jp/developer/xml/data/20261025184826_0_VPTW61_010000.xml" rel="alternate"/>
+    <updated>2026-10-25T18:48:25Z</updated>
+    <id>20261025184826</id>
+  </entry>
+  <entry>
+    <title>台風解析・予報情報（５日予報）</title>
+    <link href="https://www.data.jma.go.jp/developer/xml/data/20261025124055_0_VPTW60_010000.xml" rel="alternate"/>
+    <updated>2026-10-25T18:40:54Z</updated>
+    <id>20261025124055</id>
+  </entry>
+  <entry>
+    <title>台風の暴風域に入る確率</title>
+    <link href="https://www.data.jma.go.jp/developer/xml/data/20261025185500_0_VPTA51_010000.xml" rel="alternate"/>
+    <updated>2026-10-25T18:53:04Z</updated>
+    <id>20261025185500</id>
+  </entry>
+</feed>

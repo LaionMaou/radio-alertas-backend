@@ -1,0 +1,41 @@
+{
+  "id": "5ee1681202add671a1e1ae39",
+  "code": 551,
+  "time": "2026/10/25 13:04:06.958",
+  "issue": {
+    "source": "気象庁",
+    "time": "2026/10/25 13:04:00",
+    "type": "DetailScale",
+    "correct": "None"
+  },
+  "earthquake": {
+    "time": "2026/10/25 12:59:00",
+    "hypocenter": {
+      "depth": 50,
+      "latitude": 38.1,
+      "longitude": 142.0,
+      "magnitude": 7.2,
+      "name": "宮城県沖"
+    },
+    "maxScale": 50,
+    "domesticTsunami": "None",
+    "foreignTsunami": "Unknown"
+  },
+  "points": [
+    {
+      "addr": "石巻市",
+      "isArea": false,
+      "pref": "宮城県",
+      "scale": 50
+    },
+    {
+      "addr": "仙台市",
+      "isArea": false,
+      "pref": "宮城県",
+      "scale": 45
+    }
+  ],
+  "comments": {
+    "freeFormComment": ""
+  }
+}

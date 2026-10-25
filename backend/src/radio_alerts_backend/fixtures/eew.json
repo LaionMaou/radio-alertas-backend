@@ -1,0 +1,41 @@
+{
+  "code": 556,
+  "test": false,
+  "cancelled": false,
+  "earthquake": {
+    "condition": "",
+    "hypocenter": {
+      "name": "宮城県沖",
+      "reduceName": "宮城県沖",
+      "latitude": 38.1,
+      "longitude": 142.0,
+      "depth": 50.0,
+      "magnitude": 7.2
+    },
+    "originTime": "2026/10/25 13:05:00",
+    "arrivalTime": "2026/10/25 13:05:10"
+  },
+  "issue": {
+    "time": "2026/10/25 13:05:18",
+    "eventId": "20261025130518",
+    "serial": "1"
+  },
+  "areas": [
+    {
+      "pref": "宮城県",
+      "name": "宮城県北部",
+      "scaleFrom": 45.0,
+      "scaleTo": 99.0,
+      "kindCode": "10",
+      "arrivalTime": "2026/10/25 13:05:20"
+    },
+    {
+      "pref": "岩手県",
+      "name": "岩手県沿岸南部",
+      "scaleFrom": 40.0,
+      "scaleTo": 50.0,
+      "kindCode": "11",
+      "arrivalTime": null
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "code": 552,
+  "cancelled": true,
+  "issue": {
+    "source": "気象庁",
+    "time": "2026/10/25 14:00:00",
+    "type": "Focus"
+  },
+  "areas": []
+}

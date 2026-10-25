@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Report xmlns="http://xml.kishou.go.jp/jmaxml1/" xmlns:jmx="http://xml.kishou.go.jp/jmaxml1/">
+  <Control>
+    <Title>台風の暴風域に入る確率</Title>
+    <DateTime>2026-10-25T18:53:04Z</DateTime>
+    <Status>通常</Status>
+    <PublishingOffice>気象庁</PublishingOffice>
+  </Control>
+  <Head xmlns="http://xml.kishou.go.jp/jmaxml1/informationBasis1/">
+    <Title>台風の暴風域に入る確率</Title>
+    <ReportDateTime>2026-10-26T03:55:00+09:00</ReportDateTime>
+    <TargetDateTime>2026-10-26T03:00:00+09:00</TargetDateTime>
+    <EventID>TC2637</EventID>
+    <InfoType>発表</InfoType>
+    <Serial>23</Serial>
+  </Head>
+  <Body>
+    <MeteorologicalInfos type="台風情報">
+      <MeteorologicalInfo type="台風呼称">
+        <DateTime>2026-10-26T03:00:00+09:00</DateTime>
+        <Item>
+          <Kind>
+            <Property>
+              <Type>呼称</Type>
+              <TyphoonNamePart>
+                <Name>IN-FA</Name>
+                <NameKana>インファ</NameKana>
+                <Number>2631</Number>
+              </TyphoonNamePart>
+            </Property>
+          </Kind>
+        </Item>
+      </MeteorologicalInfo>
+      <MeteorologicalInfo type="台風の暴風域に入る確率（1日積算）">
+        <DateTime>2026-10-26T03:00:00+09:00</DateTime>
+        <Item>
+          <Kind>
+            <Property>
+              <Type>台風の暴風域に入る確率</Type>
+              <FiftyKtWindProbabilityPart>
+                <FiftyKtWindProbability unit="%">45</FiftyKtWindProbability>
+              </FiftyKtWindProbabilityPart>
+            </Property>
+          </Kind>
+          <Area>
+            <Name>小笠原諸島</Name>
+            <Code>130040</Code>
+            <Prefecture>東京都</Prefecture>
+            <PrefectureCode>130000</PrefectureCode>
+          </Area>
+        </Item>
+        <Item>
+          <Kind>
+            <Property>
+              <Type>台風の暴風域に入る確率</Type>
+              <FiftyKtWindProbabilityPart>
+                <FiftyKtWindProbability unit="%">5</FiftyKtWindProbability>
+              </FiftyKtWindProbabilityPart>
+            </Property>
+          </Kind>
+          <Area>
+            <Name>宗谷北部</Name>
+            <Code>011011</Code>
+            <Prefecture>宗谷地方</Prefecture>
+            <PrefectureCode>011000</PrefectureCode>
+          </Area>
+        </Item>
+        <Item>
+          <Kind>
+            <Property>
+              <Type>台風の暴風域に入る確率</Type>
+              <FiftyKtWindProbabilityPart>
+                <FiftyKtWindProbability unit="%">80</FiftyKtWindProbability>
+              </FiftyKtWindProbabilityPart>
+            </Property>
+          </Kind>
+          <Area>
+            <Name>那覇</Name>
+            <Code>471010</Code>
+            <Prefecture>沖縄地方</Prefecture>
+            <PrefectureCode>471000</PrefectureCode>
+          </Area>
+        </Item>
+      </MeteorologicalInfo>
+      <TimeSeriesInfo>
+        <TimeDefines>
+          <TimeDefine timeId="1">
+            <DateTime>2026-10-26T03:00:00+09:00</DateTime>
+            <Duration>PT3H</Duration>
+          </TimeDefine>
+          <TimeDefine timeId="2">
+            <DateTime>2026-10-26T06:00:00+09:00</DateTime>
+            <Duration>PT3H</Duration>
+          </TimeDefine>
+        </TimeDefines>
+        <Item>
+          <Kind>
+            <Property>
+              <Type>台風の暴風域に入る確率</Type>
+              <FiftyKtWindProbabilityPart>
+                <FiftyKtWindProbability refID="1" unit="%">20</FiftyKtWindProbability>
+                <FiftyKtWindProbability refID="2" unit="%">55</FiftyKtWindProbability>
+              </FiftyKtWindProbabilityPart>
+            </Property>
+          </Kind>
+          <Area>
+            <Name>小笠原諸島</Name>
+            <Code>130040</Code>
+            <Prefecture>東京都</Prefecture>
+            <PrefectureCode>130000</PrefectureCode>
+          </Area>
+        </Item>
+        <Item>
+          <Kind>
+            <Property>
+              <Type>台風の暴風域に入る確率</Type>
+              <FiftyKtWindProbabilityPart>
+                <FiftyKtWindProbability refID="1" unit="%">0</FiftyKtWindProbability>
+                <FiftyKtWindProbability refID="2" unit="%">2</FiftyKtWindProbability>
+              </FiftyKtWindProbabilityPart>
+            </Property>
+          </Kind>
+          <Area>
+            <Name>宗谷北部</Name>
+            <Code>011011</Code>
+            <Prefecture>宗谷地方</Prefecture>
+            <PrefectureCode>011000</PrefectureCode>
+          </Area>
+        </Item>
+      </TimeSeriesInfo>
+    </MeteorologicalInfos>
+  </Body>
+</Report>

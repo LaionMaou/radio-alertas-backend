@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Report xmlns="http://xml.kishou.go.jp/jmaxml1/" xmlns:jmx="http://xml.kishou.go.jp/jmaxml1/" xmlns:jmx_add="http://xml.kishou.go.jp/jmaxml1/addition1/">
+  <Control>
+    <Title>台風解析・予報情報（５日予報）（Ｈ３０）</Title>
+    <DateTime>2026-10-25T18:48:25Z</DateTime>
+    <Status>通常</Status>
+    <PublishingOffice>気象庁</PublishingOffice>
+  </Control>
+  <Head>
+    <Title>台風解析・予報情報</Title>
+    <ReportDateTime>2026-10-26T03:50:00+09:00</ReportDateTime>
+    <TargetDateTime>2026-10-26T03:00:00+09:00</TargetDateTime>
+    <TargetDuration>PT120H</TargetDuration>
+    <EventID>TC2637</EventID>
+    <InfoType>発表</InfoType>
+    <Serial>23</Serial>
+    <InfoKind>台風解析・予報情報（５日予報）</InfoKind>
+  </Head>
+  <Body>
+    <MeteorologicalInfos type="台風情報">
+      <MeteorologicalInfo>
+        <DateTime type="実況">2026-10-26T03:00:00+09:00</DateTime>
+        <Item>
+          <Kind>
+            <Property>
+              <Type>呼称</Type>
+              <TyphoonNamePart>
+                <Name>IN-FA</Name>
+                <NameKana>インファ</NameKana>
+                <Number>2631</Number>
+                <Remark></Remark>
+              </TyphoonNamePart>
+            </Property>
+          </Kind>
+          <Kind>
+            <Property>
+              <Type>階級</Type>
+              <ClassPart>
+                <TyphoonClass type="熱帯擾乱種類">台風(STS)</TyphoonClass>
+                <AreaClass type="大きさ階級"></AreaClass>
+                <IntensityClass type="強さ階級"></IntensityClass>
+              </ClassPart>
+            </Property>
+          </Kind>
+          <Kind>
+            <Property>
+              <Type>中心</Type>
+              <CenterPart>
+                <Coordinate type="中心位置（度）" description="北緯１３．６度東経１６４．６度" condition="ほぼ正確">+13.6+164.6/</Coordinate>
+                <Coordinate type="中心位置（度分）" description="北緯１３度３５分東経１６４度３５分" condition="ほぼ正確">+1335+16435/</Coordinate>
+                <Location>マーシャル諸島</Location>
+                <Direction type="移動方向" unit="１６方位漢字">北西</Direction>
+                <Speed type="移動速度" unit="ノット" condition="ゆっくり">0</Speed>
+                <Speed type="移動速度" unit="km/h" condition="ゆっくり">0</Speed>
+                <Pressure type="中心気圧" unit="hPa" description="中心気圧９９２ヘクトパスカル">992</Pressure>
+              </CenterPart>
+            </Property>
+          </Kind>
+          <Kind>
+            <Property>
+              <Type>風</Type>
+              <WindPart>
+                <WindSpeed type="最大風速" condition="中心付近" unit="ノット">60</WindSpeed>
+                <WindSpeed type="最大風速" condition="中心付近" unit="m/s">30</WindSpeed>
+                <WindSpeed type="最大瞬間風速" unit="ノット">85</WindSpeed>
+                <WindSpeed type="最大瞬間風速" unit="m/s">45</WindSpeed>
+              </WindPart>
+            </Property>
+          </Kind>
+          <Area>
+            <Name>熱帯低気圧</Name>
+          </Area>
+        </Item>
+      </MeteorologicalInfo>
+      <MeteorologicalInfo>
+        <DateTime type="予報　２４時間後">2026-10-27T03:00:00+09:00</DateTime>
+        <Item>
+          <Kind>
+            <Property>
+              <Type>階級</Type>
+              <ClassPart>
+                <TyphoonClass type="熱帯擾乱種類">台風(TY)</TyphoonClass>
+              </ClassPart>
+            </Property>
+          </Kind>
+          <Kind>
+            <Property>
+              <Type>中心</Type>
+              <CenterPart>
+                <Coordinate type="中心位置（度）">+14.4+163.2/</Coordinate>
+                <Pressure type="中心気圧" unit="hPa">985</Pressure>
+              </CenterPart>
+            </Property>
+          </Kind>
+          <Area>
+            <Name>熱帯低気圧</Name>
+          </Area>
+        </Item>
+      </MeteorologicalInfo>
+    </MeteorologicalInfos>
+  </Body>
+</Report>

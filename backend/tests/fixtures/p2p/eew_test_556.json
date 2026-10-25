@@ -1,0 +1,11 @@
+{
+  "code": 556,
+  "test": true,
+  "cancelled": false,
+  "issue": {
+    "time": "2026/10/25 13:05:18",
+    "eventId": "test-event",
+    "serial": "1"
+  },
+  "areas": []
+}
