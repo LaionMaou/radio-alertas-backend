@@ -6,9 +6,8 @@ daemon de Docker.
 
 ## 0. Antes de empezar
 
-- El contenedor `alerts-tts` ya existe y está sano (`curl -s
-  http://127.0.0.1:8090/health`).
-- `docker network ls` no muestra `radio-alerts` todavía en la primera instalación.
+- Acceso root al VPS. Si AzuraCast ya corre ahí, Docker y Compose también están.
+- `docker network ls` no muestra `radio-alerts` en la primera instalación.
 - Los puertos `8081` y `127.0.0.1:3000` están libres.
 - `DRY_RUN=true` en `config/.env`. No se cambia hasta la prueba audible autorizada
   (sección 6).
@@ -16,23 +15,49 @@ daemon de Docker.
 ## 1. Instalación
 
 ```bash
-docker network create radio-alerts      # solo si no existe
-mkdir -p data logs
-sudo chown -R 10001:10001 data logs     # el contenedor corre con UID 10001
-cp config/.env.example config/.env
-chmod 600 config/.env
+sudo mkdir -p /var/alertas
+sudo rsync -a --exclude .git --exclude .venv ./ /var/alertas/
+cd /var/alertas
+sudo ./install.sh --tts-src /ruta/a/radio-alerts-tts
 ```
 
-Completar en `config/.env`:
+`install.sh` es idempotente y hace, en orden:
 
-| Variable | Valor |
-| --- | --- |
-| `TTS_API_TOKEN` | el mismo `API_TOKEN` del proyecto `radio-alerts-tts` |
-| `INTERNAL_TOKEN` | `openssl rand -hex 32` |
-| `TYPHOON_AREAS` | vacío si no se quiere audio de tifón |
-| `DISCORD_WEBHOOK_URL` | vacío para desactivar |
+1. Comprueba root, espacio en disco y que no se esté instalando dentro de AzuraCast.
+2. Instala Docker y el plugin Compose **solo si faltan**; si el daemon ya corre, no
+   lo toca.
+3. Crea la red externa `radio-alerts`.
+4. Copia la cadena TTS desde `--tts-src` a `./tts` (omite `.git`, `.venv`, `data`).
+5. Crea `data/`, `logs/`, `config/.env` y `tts/.env` si no existen, genera
+   `INTERNAL_TOKEN` y el `API_TOKEN` compartido (el mismo en `tts/.env` y en
+   `TTS_API_TOKEN` del backend), y fija `TTS_API_URL` con el `API_PORT` del TTS.
+6. Construye y levanta backend + web, después la cadena TTS, y espera el `healthy`
+   de cada contenedor.
+7. Verifica `/health`, que nginx devuelva 404 en `/internal/*` y avisa si ufw
+   bloquea 8081.
 
-La cadena TTS debe declarar la red compartida. En `radio-alerts-tts`:
+Nunca imprime tokens. Si algo falla, termina con código 1 y los últimos logs del
+contenedor problemático.
+
+Si al copiar el proyecto desde Windows el script llega sin permiso de ejecución
+(`Permission denied`), alcanza con `sudo chmod +x install.sh` o `sudo bash
+install.sh`.
+
+Sin `--tts-src` usa un `./tts` ya existente; con `--no-tts` instala solo
+backend + web. `--open-firewall` abre 8081/tcp en ufw.
+
+Después de instalar, revisar:
+
+- `config/.env`: `TYPHOON_AREAS` (vacío si no se quiere audio de tifón) y
+  `DISCORD_WEBHOOK_URL` (vacío para desactivar). `INTERNAL_TOKEN` y
+  `TTS_API_TOKEN` ya los generó y sincronizó el script.
+- `tts/.env`: para el paso a audio real hacen falta `AZURACAST_BASE_URL`,
+  `AZURACAST_STATION_SHORT_NAME`, `AZURACAST_STREAMER_USER`,
+  `AZURACAST_STREAMER_PASSWORD`, `AZURACAST_DJ_HOST` y `AZURACAST_DJ_PORT`. Con
+  `DRY_RUN=true` arranca igual sin credenciales.
+
+El `docker-compose.yml` de la cadena TTS ya declara la red compartida. Si usás
+otra copia, comprobá que tenga:
 
 ```yaml
 services:
@@ -44,18 +69,18 @@ networks:
     name: radio-alerts
 ```
 
-y recrear solo ese servicio (`docker compose up -d alerts-tts`). No hace falta
-reiniciar nada más.
+## 2. Rearranque y actualización
 
-## 2. Arranque
+El script ya deja todo levantado. Para reconstruir tras cambiar código:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d --build
+docker compose -f tts/docker-compose.yml up -d --build   # solo si hay TTS
 docker compose -f deploy/docker-compose.yml ps
 ```
 
 El `Dockerfile` corre `HEALTHCHECK` cada 30 s; `ps` muestra `healthy` cuando
-`/health` responde `status=ok`.
+`/health` responde `status=ok`. No usar `down -v`: borra los volúmenes de datos.
 
 ## 3. Verificación
 

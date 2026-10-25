@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -129,3 +130,19 @@ def test_env_example_ships_dry_run() -> None:
     text = ENV_EXAMPLE.read_text(encoding="utf-8")
 
     assert "DRY_RUN=true" in text
+
+
+def test_install_script_is_executable() -> None:
+    path = ROOT / "install.sh"
+
+    assert path.is_file()
+    if os.name == "nt":  # NTFS no guarda el bit de ejecución
+        return
+    assert path.stat().st_mode & 0o111, "install.sh tiene que ser ejecutable"
+
+
+def test_gitignore_covers_generated_files() -> None:
+    text = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+    for entry in ("config/.env", "tts/", "data/", "logs/"):
+        assert entry in text

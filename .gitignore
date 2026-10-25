@@ -2,6 +2,7 @@
 config/.env
 data/
 logs/
+tts/
 .venv/
 __pycache__/
 *.py[cod]

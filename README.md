@@ -31,6 +31,7 @@ P2PQuake WS (1 conexión)          JMA (solo por evento / cada 10 min)
 ## Estructura
 
 ```
+install.sh                instalador para el VPS (estilo AzuraCast)
 backend/                  servicio FastAPI (Python 3.11+)
   src/radio_alerts_backend/
   scripts/healthcheck.py
@@ -41,6 +42,7 @@ deploy/nginx/radio-alerts.conf
 config/.env.example
 docs/P2P_Y_JMA.md         contratos externos verificados
 docs/OPERACION.md         runbook de despliegue y operación
+tts/                      cadena TTS copiada por install.sh (no versionada)
 ```
 
 ## Desarrollo local
@@ -83,7 +85,24 @@ no se publican en nginx y no deben exponerse nunca a Internet.
 
 ## Despliegue
 
-Resumen; el procedimiento completo está en [docs/OPERACION.md](docs/OPERACION.md).
+El proyecto vive en `/var/alertas`, igual que AzuraCast en `/var/AzuraCast`:
+
+```bash
+sudo mkdir -p /var/alertas
+sudo rsync -a --exclude .git --exclude .venv ./ /var/alertas/
+cd /var/alertas
+sudo ./install.sh --tts-src /ruta/a/radio-alerts-tts
+```
+
+`install.sh` instala Docker y Compose si faltan (nunca reinicia un daemon que ya
+está corriendo), crea la red `radio-alerts`, genera `INTERNAL_TOKEN` y el
+`API_TOKEN` compartido, construye y levanta todo, y espera el `healthy` de cada
+servicio. Se puede reejecutar sin pisar `config/.env`, `tts/.env` ni `data/`.
+
+Opciones: `--no-tts` (solo backend + web) y `--open-firewall` (abre 8081/tcp en
+ufw). El procedimiento completo está en [docs/OPERACION.md](docs/OPERACION.md).
+
+Equivalente manual, si se prefiere paso a paso:
 
 ```bash
 docker network create radio-alerts      # una sola vez, si no existe
