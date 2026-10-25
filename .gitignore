@@ -1,5 +1,9 @@
 .env
 config/.env
+config/install.conf
+config/nginx/
+config/certs/
+config/acme/
 data/
 logs/
 tts/

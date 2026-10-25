@@ -19,13 +19,15 @@ P2PQuake WS (1 conexión)          JMA (solo por evento / cada 10 min)
              SSE / HTTP    │          │ POST /alert + GET /alert/{id}
                            ▼          ▼
                      nginx :8081   alerts-tts :8090
+                       (o 8443 TLS)   │
                            │          │
                      web estática     └──► Kokoro → WebDJ → AzuraCast
 ```
 
 - Red Docker compartida `radio-alerts`: `backend` ↔ `alerts-tts`.
 - Red `default` de este compose: `web` ↔ `backend`.
-- Puertos publicados: `8081` (web) y `127.0.0.1:3000` (backend, solo depuración).
+- Puertos publicados: el de la web (`8081` en HTTP, `8443` en HTTPS por defecto,
+  configurable) y `127.0.0.1:3000` (backend, solo depuración).
   `POST /internal/*` nunca se publica.
 
 ## Estructura
@@ -43,6 +45,11 @@ config/.env.example
 docs/P2P_Y_JMA.md         contratos externos verificados
 docs/OPERACION.md         runbook de despliegue y operación
 tts/                      cadena TTS copiada por install.sh (no versionada)
+config/install.conf       lo que se eligió al instalar (no versionado)
+deploy/nginx/snippets/    headers y proxy compartidos por las dos variantes
+deploy/nginx/radio-alerts-tls.conf  variante HTTPS (listen 443 ssl)
+deploy/acme-reload.sh     recarga nginx tras emitir/renovar el certificado
+deploy/acme-renew.sh      renovación diaria (la llama /etc/cron.d/radio-alertas)
 ```
 
 ## Desarrollo local
@@ -99,19 +106,63 @@ está corriendo), crea la red `radio-alerts`, genera `INTERNAL_TOKEN` y el
 `API_TOKEN` compartido, construye y levanta todo, y espera el `healthy` de cada
 servicio. Se puede reejecutar sin pisar `config/.env`, `tts/.env` ni `data/`.
 
-Opciones: `--no-tts` (solo backend + web) y `--open-firewall` (abre 8081/tcp en
-ufw). El procedimiento completo está en [docs/OPERACION.md](docs/OPERACION.md).
+Sin flags y con terminal interactiva pregunta qué instalar; las respuestas
+quedan en `config/install.conf` (0600) y los reejecutados las reusan. Para
+cambiarlas: `sudo ./install.sh --configure`. Todo lo demás es equivalente pero
+no interactivo:
+
+```bash
+sudo ./install.sh --services backend,web --tts-src /ruta/a/radio-alerts-tts
+```
+
+| Flag | Efecto |
+| --- | --- |
+| `--services LISTA` | `all` (defecto), `backend`, `web`, `tts` o combinación con comas; `web` arrastra el backend |
+| `--port N` | puerto público de la web (`8081` en HTTP, `8443` en HTTPS) |
+| `--domain DOM` | subdominio de la web; obligatorio con HTTPS |
+| `--tls none\|letsencrypt\|gts` | HTTP, o HTTPS con la CA elegida |
+| `--acme-email EMAIL` | contacto de la cuenta ACME |
+| `--cf-token-file RUTA` | archivo con `CF_Token=...` de Cloudflare |
+| `--gts-eab-kid`, `--gts-eab-hmac-file` | credenciales EAB de Google Trust Services |
+| `--staging` | entorno de pruebas de Let's Encrypt |
+| `--non-interactive` | no pregunta: usa flags + `config/install.conf` |
+| `--tts-src RUTA`, `--no-tts` | copiar la cadena TTS / no instalarla |
+| `--open-firewall` | abre en ufw solo el puerto web elegido |
+
+HTTPS se valida por **DNS-01 contra Cloudflare**, así que no necesita publicar
+los puertos 80/443 (que usa AzuraCast ni se tocan):
+
+```bash
+sudo ./install.sh --services all --domain alertas.ejemplo.com --port 8443 \
+  --tls letsencrypt --acme-email ops@ejemplo.com \
+  --cf-token-file /root/cf-token.env --tts-src /ruta/a/radio-alerts-tts
+```
+
+El subdominio tiene que apuntar al VPS (registro `A`, modo *DNS only*). El
+certificado queda en `config/certs/` y se renueva solo a las 03:17 vía
+`/etc/cron.d/radio-alertas` (log en `logs/acme.log`). Para Google Trust
+Services: `--tls gts --gts-eab-kid KID --gts-eab-hmac-file RUTA`, con Public CA
+habilitada en el proyecto de Google Cloud.
+
+El procedimiento completo, con diagnóstico y renovación, está en
+[docs/OPERACION.md](docs/OPERACION.md).
 
 Equivalente manual, si se prefiere paso a paso:
 
 ```bash
 docker network create radio-alerts      # una sola vez, si no existe
-mkdir -p data logs
+mkdir -p data logs config/nginx/snippets config/certs
+cp deploy/nginx/snippets/*.inc config/nginx/snippets/
+cp deploy/nginx/radio-alerts.conf config/nginx/site.conf   # variante HTTP
+printf 'WEB_PORT=8081\nWEB_INTERNAL_PORT=80\n' > config/install.conf
 sudo chown -R 10001:10001 data logs     # el contenedor corre sin root
 cp config/.env.example config/.env      # completar secretos y chmod 600
-docker compose -f deploy/docker-compose.yml up -d --build
+docker compose --env-file config/install.conf -f deploy/docker-compose.yml up -d --build
 curl -s http://127.0.0.1:3000/health
 ```
+
+Para HTTPS el paso manual no alcanza (hay que emitir el certificado y renderizar
+`deploy/nginx/radio-alerts-tls.conf` con el dominio): usá el instalador.
 
 El contenedor TTS debe estar en la misma red `radio-alerts` y usar el mismo
 `TTS_API_TOKEN` / `API_TOKEN`.

@@ -8,7 +8,9 @@ daemon de Docker.
 
 - Acceso root al VPS. Si AzuraCast ya corre ahí, Docker y Compose también están.
 - `docker network ls` no muestra `radio-alerts` en la primera instalación.
-- Los puertos `8081` y `127.0.0.1:3000` están libres.
+- `127.0.0.1:3000` libre y **el puerto elegido para la web** libre
+  (`8081` por defecto en HTTP, `8443` en HTTPS). Los puertos 80 y 443 son de
+  AzuraCast: este stack no los publica nunca.
 - `DRY_RUN=true` en `config/.env`. No se cambia hasta la prueba audible autorizada
   (sección 6).
 
@@ -18,23 +20,34 @@ daemon de Docker.
 sudo mkdir -p /var/alertas
 sudo rsync -a --exclude .git --exclude .venv ./ /var/alertas/
 cd /var/alertas
-sudo ./install.sh --tts-src /ruta/a/radio-alerts-tts
+sudo ./install.sh
 ```
+
+Con terminal interactiva el script pregunta qué instalar (servicios, HTTP o
+HTTPS, CA, credenciales, puerto y dominio) y guarda las respuestas en
+`config/install.conf` (0600). Los reejecutados reusan ese archivo sin preguntar;
+para volver al asistente, `sudo ./install.sh --configure`. Sin TTY hay que pasar
+las opciones o tener ya un `install.conf`.
 
 `install.sh` es idempotente y hace, en orden:
 
-1. Comprueba root, espacio en disco y que no se esté instalando dentro de AzuraCast.
+1. Comprueba root, espacio en disco, RAM y que no se esté instalando dentro de AzuraCast.
 2. Instala Docker y el plugin Compose **solo si faltan**; si el daemon ya corre, no
    lo toca.
 3. Crea la red externa `radio-alerts`.
-4. Copia la cadena TTS desde `--tts-src` a `./tts` (omite `.git`, `.venv`, `data`).
+4. Copia la cadena TTS desde `--tts-src` a `./tts` (omite `.git`, `.venv`, `data`),
+   solo si la cadena está seleccionada.
 5. Crea `data/`, `logs/`, `config/.env` y `tts/.env` si no existen, genera
    `INTERNAL_TOKEN` y el `API_TOKEN` compartido (el mismo en `tts/.env` y en
    `TTS_API_TOKEN` del backend), y fija `TTS_API_URL` con el `API_PORT` del TTS.
-6. Construye y levanta backend + web, después la cadena TTS, y espera el `healthy`
-   de cada contenedor.
-7. Verifica `/health`, que nginx devuelva 404 en `/internal/*` y avisa si ufw
-   bloquea 8081.
+   Estos pasos solo corren para los servicios que se instalan.
+6. Si hay web, renderiza `config/nginx/site.conf` desde `deploy/nginx`, lo valida
+   con `nginx -t` en un contenedor efímero y, con HTTPS, emite el certificado
+   antes de levantar nada (sección 1.1).
+7. Construye y levanta **solo los servicios elegidos** y espera el `healthy` de
+   cada contenedor. Los que se hayan deseleccionado quedan detenidos.
+8. Verifica `/health`, que nginx devuelva 404 en `/internal/*` sobre el esquema y
+   puerto elegidos, y avisa si el firewall bloquea el puerto web.
 
 Nunca imprime tokens. Si algo falla, termina con código 1 y los últimos logs del
 contenedor problemático.
@@ -43,8 +56,49 @@ Si al copiar el proyecto desde Windows el script llega sin permiso de ejecución
 (`Permission denied`), alcanza con `sudo chmod +x install.sh` o `sudo bash
 install.sh`.
 
-Sin `--tts-src` usa un `./tts` ya existente; con `--no-tts` instala solo
-backend + web. `--open-firewall` abre 8081/tcp en ufw.
+Sin `--tts-src` usa un `./tts` ya existente; con `--no-tts` (o sin la cadena en
+la lista de servicios) instala solo lo demás. `--open-firewall` abre en ufw
+**solo** el puerto web elegido.
+
+### 1.1 HTTPS (Let's Encrypt o Google Trust Services)
+
+El certificado se emite por **DNS-01**, que no necesita puertos entrantes: no se
+publica el 80 ni se toca el nginx de AzuraCast. Requiere que el subdominio esté
+en una zona de Cloudflare y apunte al VPS con un registro `A` en modo **DNS
+only** (nube gris).
+
+1. Crear un token de API de Cloudflare con permiso `Zone.DNS:Edit` acotado a esa
+   zona y guardarlo en un archivo, por ejemplo `/root/cf-token.env` (0600):
+
+   ```
+   CF_Token=xxxxxxxxxxxxxxxxxxxxxxxx
+   ```
+
+2. Instalar con HTTPS:
+
+   ```bash
+   sudo ./install.sh --services all --domain alertas.ejemplo.com --port 8443 \
+     --tls letsencrypt --acme-email ops@ejemplo.com \
+     --cf-token-file /root/cf-token.env --tts-src /ruta/a/radio-alerts-tts
+   ```
+
+3. El script registra la cuenta ACME, emite el certificado, lo deja en
+   `config/certs/` (`fullchain.pem` + `key.pem`, 0600 la clave), programa la
+   renovación en `/etc/cron.d/radio-alertas` (03:17) y recién entonces levanta
+   nginx. El token queda en `config/acme/cloudflare.env` (0600).
+
+Con Google Trust Services en lugar de Let's Encrypt: `--tls gts --gts-eab-kid
+KID --gts-eab-hmac-file RUTA`. El proyecto de Google Cloud necesita **Public CA**
+habilitada para poder pedir el KID y la clave HMAC.
+
+Para volver a HTTP: `sudo ./install.sh --tls none --port 8081`. El cron de
+renovación se borra solo. `--staging` usa el entorno de pruebas de Let's
+Encrypt: sirve para validar la cadena completa sin gastar el límite de
+emisiones reales.
+
+La renovación corre a diario y deja el log en `logs/acme.log`. Si el DNS cambia
+de proveedor o el token se revoca, falla en silencio: revisar ese log y
+`config/acme/home/acme.sh --list`.
 
 Después de instalar, revisar:
 
@@ -74,10 +128,14 @@ networks:
 El script ya deja todo levantado. Para reconstruir tras cambiar código:
 
 ```bash
-docker compose -f deploy/docker-compose.yml up -d --build
+docker compose --env-file config/install.conf -f deploy/docker-compose.yml up -d --build
 docker compose -f tts/docker-compose.yml up -d --build   # solo si hay TTS
-docker compose -f deploy/docker-compose.yml ps
+docker compose --env-file config/install.conf -f deploy/docker-compose.yml ps
 ```
+
+El `--env-file config/install.conf` no es opcional: de ahí salen `WEB_PORT` y
+`WEB_INTERNAL_PORT`. Sin él, Compose usa los valores por defecto y recrea la web
+en `8081:80` aunque se haya elegido otro puerto o HTTPS.
 
 El `Dockerfile` corre `HEALTHCHECK` cada 30 s; `ps` muestra `healthy` cuando
 `/health` responde `status=ok`. No usar `down -v`: borra los volúmenes de datos.
@@ -85,10 +143,18 @@ El `Dockerfile` corre `HEALTHCHECK` cada 30 s; `ps` muestra `healthy` cuando
 ## 3. Verificación
 
 ```bash
-docker compose -f deploy/docker-compose.yml exec web nginx -t
+docker compose --env-file config/install.conf -f deploy/docker-compose.yml exec web nginx -t
 curl -s http://127.0.0.1:3000/health
+
+# HTTP (puerto 8081 por defecto)
 curl -s http://127.0.0.1:8081/api/alert/latest
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/internal/trigger-tts
+
+# HTTPS (dominio y puerto elegidos)
+curl -s --resolve alertas.ejemplo.com:8443:127.0.0.1 https://alertas.ejemplo.com:8443/api/alert/latest
+curl -s -o /dev/null -w '%{http_code}\n' \
+  --resolve alertas.ejemplo.com:8443:127.0.0.1 https://alertas.ejemplo.com:8443/internal/trigger-tts
+openssl x509 -in config/certs/fullchain.pem -noout -issuer -enddate
 ```
 
 Esperado:
@@ -97,10 +163,12 @@ Esperado:
   `degraded` al arrancar mientras P2P conecta es normal durante unos segundos.
 - `latest`: `{"alert":null}` si no hubo eventos todavía.
 - `/internal/*`: **404**. Si devuelve otra cosa, nginx no está aplicando la config.
+- El certificado muestra el emisor de la CA elegida y un `notAfter` a ~90 días.
 
-Abrir `http://IP-DEL-VPS:8081/`: la cabecera debe mostrar `ライブ` (SSE) y
-`P2P 接続中`. Si el navegador no llega, revisar el firewall del VPS: solo se publica
-8081; 3000 y 8090 quedan en loopback.
+Abrir `http://IP-DEL-VPS:8081/` (o `https://alertas.ejemplo.com:8443/`): la
+cabecera debe mostrar `ライブ` (SSE) y `P2P 接続中`. Si el navegador no llega,
+revisar el firewall del VPS: solo se publica el puerto web; 3000 y 8090 quedan en
+loopback, y 80/443 no se tocan.
 
 Logs:
 
@@ -178,7 +246,12 @@ investigando.
 | `tts` en `failed` con 5xx | TTS caído o Kokoro sin modelos | `docker compose logs` del TTS |
 | `Permission denied` en `/data` o `/logs` | dueño incorrecto del bind mount | `sudo chown -R 10001:10001 data logs` |
 | Alertas duplicadas | dos workers o dos instancias | `WEB_CONCURRENCY` debe estar ausente o en `1`; `docker ps` no debe mostrar dos backends |
-| `/internal` responde 200 por 8081 | config de nginx no montada | `docker compose ... exec web nginx -T \| grep internal` |
+| `/internal` responde 200 por el puerto web | config de nginx no montada | `docker compose ... exec web nginx -T \| grep internal` |
+| `el puerto N está ocupado` al instalar | otro servicio lo tomó | elegir otro con `sudo ./install.sh --port 9443` |
+| `502 Bad Gateway` en la web | backend caído o reiniciando | `docker ps`; logs del backend |
+| `nginx: [emerg] cannot load certificate` | `config/certs/` vacío o emisión fallida | revisar `logs/acme.log` y reemitir con `--configure` |
+| La emisión ACME falla con el dominio | el subdominio no está en la zona del token | token de la zona correcta, o `--tls letsencrypt` |
+| El certificado no se renueva | token revocado o DNS movido de proveedor | `tail -50 logs/acme.log`; `config/acme/home/acme.sh --list` |
 
 Comandos útiles:
 
@@ -203,5 +276,7 @@ docker compose -f deploy/docker-compose.yml exec backend python scripts/healthch
 - **Una sola** conexión WebSocket a P2P. No escalar horizontalmente sin rediseñar.
 - JMA como mínimo 300 s entre peticiones a la misma URL.
 - `POST /internal/*` nunca se publica en nginx.
+- Los puertos 80 y 443 son de AzuraCast: no se publican y no se activa HSTS, que
+  rompería el 443 de la radio.
 - No reiniciar el daemon de Docker ni el contenedor de AzuraCast como parte de un
   despliegue de alertas.
