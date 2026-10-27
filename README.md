@@ -125,8 +125,10 @@ sudo ./install.sh --services backend,web --tts-src /ruta/a/radio-alerts-tts
 | `--cf-token-file RUTA` | archivo con `CF_Token=...` de Cloudflare |
 | `--gts-eab-kid`, `--gts-eab-hmac-file` | credenciales EAB de Google Trust Services |
 | `--staging` | entorno de pruebas de Let's Encrypt |
+| `--no-staging` | vuelve a la CA de producción (obligatorio tras una prueba staging) |
 | `--non-interactive` | no pregunta: usa flags + `config/install.conf` |
 | `--tts-src RUTA`, `--no-tts` | copiar la cadena TTS / no instalarla |
+| `--tts-port N` | puerto de la API del TTS (8090 si está libre; si no, el instalador busca otro) |
 | `--open-firewall` | abre en ufw solo el puerto web elegido |
 
 HTTPS se valida por **DNS-01 contra Cloudflare**, así que no necesita publicar

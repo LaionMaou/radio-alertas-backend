@@ -11,6 +11,12 @@ daemon de Docker.
 - `127.0.0.1:3000` libre y **el puerto elegido para la web** libre
   (`8081` por defecto en HTTP, `8443` en HTTPS). Los puertos 80 y 443 son de
   AzuraCast: este stack no los publica nunca.
+- La API del TTS usa el 8090 en loopback. **AzuraCast también publica el 8090**
+  (parte de su rango fijo de puertos de DJ), así que en un VPS con AzuraCast el
+  instalador mueve la API a otro puerto y lo guarda en `tts/.env` (`API_PORT`);
+  el backend apunta ahí por la red de Docker. Si querés fijarlo,
+  `--tts-port 18090`. `docker ps` no debe mostrar otro proceso en el puerto
+  elegido.
 - `DRY_RUN=true` en `config/.env`. No se cambia hasta la prueba audible autorizada
   (sección 6).
 
@@ -95,6 +101,17 @@ Para volver a HTTP: `sudo ./install.sh --tls none --port 8081`. El cron de
 renovación se borra solo. `--staging` usa el entorno de pruebas de Let's
 Encrypt: sirve para validar la cadena completa sin gastar el límite de
 emisiones reales.
+
+`ACME_STAGING` queda guardado en `config/install.conf`, así que después de una
+prueba hay que salir explícitamente de staging; el cambio de CA fuerza la
+reemisión:
+
+```bash
+sudo ./install.sh --tls letsencrypt --no-staging
+```
+
+Comprobar con `openssl x509 -in config/certs/fullchain.pem -noout -issuer`: en
+staging el emisor es *Fake LE Intermediate*, en producción *Let's Encrypt*.
 
 La renovación corre a diario y deja el log en `logs/acme.log`. Si el DNS cambia
 de proveedor o el token se revoca, falla en silencio: revisar ese log y

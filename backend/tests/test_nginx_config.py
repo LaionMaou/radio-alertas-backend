@@ -223,9 +223,19 @@ def test_installer_exposes_the_new_options() -> None:
         "--cf-token-file",
         "--gts-eab-kid",
         "--staging",
+        "--no-staging",
+        "--tts-port",
         "--non-interactive",
     ):
         assert flag in text, f"falta {flag} en install.sh"
+
+
+def test_installer_can_leave_the_staging_ca() -> None:
+    text = (ROOT / "install.sh").read_text(encoding="utf-8")
+
+    assert '[ "$NO_STAGING" -eq 1 ] && ACME_STAGING=0' in text, (
+        "ACME_STAGING queda en install.conf: sin --no-staging no se puede volver a producción"
+    )
 
 
 def test_installer_never_publishes_azuracast_ports_silently() -> None:

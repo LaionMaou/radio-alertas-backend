@@ -19,10 +19,12 @@
 #   --gts-eab-kid KID         credencial EAB de Google Trust Services
 #   --gts-eab-hmac-file RUTA  archivo con la clave HMAC de Google Trust Services
 #   --staging                 usar el entorno de pruebas de Let's Encrypt
+#   --no-staging              volver a la CA de producción tras una prueba staging
 #   --configure               volver a preguntar aunque ya exista config/install.conf
 #   --non-interactive         no preguntar; usar las opciones y config/install.conf
 #   --tts-src RUTA            copiar la cadena TTS desde RUTA a ./tts
 #   --no-tts                  no instalar la cadena TTS
+#   --tts-port N              puerto de la API del TTS (8090 si está libre)
 #   --open-firewall           abrir el puerto web elegido en ufw (si ufw está activo)
 #   -h, --help                mostrar esta ayuda
 set -euo pipefail
@@ -57,7 +59,8 @@ PREV_TLS_CA=""; PREV_STAGING=""
 
 FLAG_SERVICES=""; FLAG_PORT=""; FLAG_DOMAIN=""; FLAG_TLS=""
 FLAG_EMAIL=""; FLAG_CF_FILE=""; FLAG_EAB_KID=""; FLAG_EAB_HMAC_FILE=""
-STAGING=0; CONFIGURE=0; NON_INTERACTIVE=0; NO_TTS=0; OPEN_FIREWALL=0
+FLAG_TTS_PORT=""
+STAGING=0; NO_STAGING=0; CONFIGURE=0; NON_INTERACTIVE=0; NO_TTS=0; OPEN_FIREWALL=0
 TTS_SRC=""; TTS_EXPLICIT=0; BACKEND=0; WEB=0; TTS=0
 SERVICES_NORM=""; FAILURES=0; tts_port=""
 
@@ -90,10 +93,12 @@ Opciones:
   --gts-eab-kid KID         credencial EAB de Google Trust Services
   --gts-eab-hmac-file RUTA  archivo con la clave HMAC de Google Trust Services
   --staging                 usar el entorno de pruebas de Let's Encrypt
+  --no-staging              volver a la CA de producción tras una prueba staging
   --configure               volver a preguntar aunque ya exista config/install.conf
   --non-interactive         no preguntar; usar las opciones y config/install.conf
   --tts-src RUTA            copiar la cadena TTS desde RUTA a ./tts
   --no-tts                  no instalar la cadena TTS
+  --tts-port N              puerto de la API del TTS (8090 si está libre)
   --open-firewall           abrir el puerto web elegido en ufw (si ufw está activo)
   -h, --help                mostrar esta ayuda
 
@@ -235,6 +240,15 @@ port_busy() {
     ss -ltnH "sport = :$1" 2>/dev/null | grep -q .
 }
 
+find_free_port() {
+    local port="$1"
+    while [ "$port" -le 65535 ]; do
+        port_busy "$port" || { printf '%s' "$port"; return 0; }
+        port=$((port + 1))
+    done
+    return 1
+}
+
 container_running() {
     [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null || echo false)" = "true" ]
 }
@@ -287,9 +301,11 @@ while [ $# -gt 0 ]; do
         --gts-eab-hmac-file) need_arg "$@"; FLAG_EAB_HMAC_FILE="$2"; shift ;;
         --tts-src) need_arg "$@"; TTS_SRC="$2"; shift ;;
         --staging) STAGING=1 ;;
+        --no-staging) NO_STAGING=1 ;;
         --configure) CONFIGURE=1 ;;
         --non-interactive) NON_INTERACTIVE=1 ;;
         --no-tts) NO_TTS=1 ;;
+        --tts-port) need_arg "$@"; FLAG_TTS_PORT="$2"; shift ;;
         --open-firewall) OPEN_FIREWALL=1 ;;
         -h|--help) usage; exit 0 ;;
         *) die "opción desconocida: $1 (usá --help)" ;;
@@ -320,6 +336,7 @@ fi
 [ -n "$FLAG_TLS" ] && TLS_CA="$FLAG_TLS"
 [ -n "$FLAG_EMAIL" ] && ACME_EMAIL="$FLAG_EMAIL"
 [ "$STAGING" -eq 1 ] && ACME_STAGING=1
+[ "$NO_STAGING" -eq 1 ] && ACME_STAGING=0
 
 SERVICES="${SERVICES:-all}"
 TLS_CA="${TLS_CA:-none}"
@@ -597,6 +614,21 @@ if [ "$TTS" -eq 1 ]; then
 
     tts_port="$(env_get "$TTS_ENV" API_PORT)"
     tts_port="${tts_port:-8090}"
+    if [ -n "$FLAG_TTS_PORT" ]; then
+        validate_port "$FLAG_TTS_PORT"
+        tts_port="$FLAG_TTS_PORT"
+    fi
+
+    if port_busy "$tts_port" && ! container_running kuma-alerts-tts; then
+        if [ -n "$FLAG_TTS_PORT" ]; then
+            die "el puerto $tts_port para el TTS está ocupado"
+        fi
+        free_tts_port="$(find_free_port $((tts_port + 10000)))" \
+            || die "no encuentro un puerto libre para la API del TTS; pasá --tts-port"
+        warn "el puerto $tts_port está ocupado (AzuraCast publica 8090); la API del TTS pasa a $free_tts_port"
+        tts_port="$free_tts_port"
+    fi
+    env_set "$TTS_ENV" API_PORT "$tts_port"
 
     if [ "$BACKEND" -eq 1 ]; then
         env_set "$BACKEND_ENV" TTS_API_TOKEN "$(env_get "$TTS_ENV" API_TOKEN)"
