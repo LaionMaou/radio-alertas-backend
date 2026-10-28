@@ -716,6 +716,7 @@ ensure_acme() {
 
 issue_certificate() {
     local ca_server="$LE_SERVER" force=""
+    local acme_cert="$ACME_HOME/${DOMAIN}_ecc/fullchain.cer"
 
     if [ "$TLS_CA" = "gts" ]; then
         ca_server="$GTS_SERVER"
@@ -752,9 +753,16 @@ issue_certificate() {
             --home "$ACME_HOME" --config-home "$ACME_HOME" \
             --keylength ec-256 ${force:+$force} >>"$ACME_LOG" 2>&1; then
         unset CF_Token
-        warn "últimas líneas del intento de emisión:"
-        tail -n 20 "$ACME_LOG" >&2 || true
-        die "no se pudo emitir el certificado; revisá el token y que el subdominio esté en esa zona"
+        # acme.sh también sale con error cuando saltea la emisión porque el
+        # certificado está vigente; eso no es un fallo de instalación.
+        if [ -s "$acme_cert" ] && \
+            openssl x509 -in "$acme_cert" -noout -checkend 604800 >/dev/null 2>&1; then
+            warn "ya hay un certificado vigente para $DOMAIN; se reusa y la renovación sigue por cron"
+        else
+            warn "últimas líneas del intento de emisión:"
+            tail -n 20 "$ACME_LOG" >&2 || true
+            die "no se pudo emitir el certificado; revisá el token y que el subdominio esté en esa zona"
+        fi
     fi
     unset CF_Token
 

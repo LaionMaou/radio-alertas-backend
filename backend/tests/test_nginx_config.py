@@ -306,6 +306,17 @@ def test_installer_pins_the_acme_release_and_names_it_on_failure() -> None:
     )
 
 
+def test_installer_reuses_a_valid_certificate_when_acme_skips() -> None:
+    text = (ROOT / "install.sh").read_text(encoding="utf-8")
+    branch = text.split('--issue --server "$ca_server"', 1)[1].split("unset CF_Token", 2)[1]
+
+    assert "-checkend 604800" in branch, (
+        "acme.sh sale con error al saltear una emisión todavía vigente; sin esta "
+        "comprobación cada update falla aunque el certificado esté bien"
+    )
+    assert "se reusa y la renovación sigue por cron" in branch
+
+
 def test_installer_regenerates_every_example_token() -> None:
     text = (ROOT / "install.sh").read_text(encoding="utf-8")
     body = text.split("is_placeholder() {", 1)[1].split("}", 1)[0]
