@@ -93,18 +93,30 @@ no se publican en nginx y no deben exponerse nunca a Internet.
 
 ## Despliegue
 
-La forma más corta, sin clonar nada: `bootstrap.sh` baja el repo y ejecuta el
-instalador con los argumentos que le pases. Al pipear no hay terminal
-interactiva, así que las opciones van en la línea:
+Igual que AzuraCast: el instalador se baja dentro de la carpeta donde querés el
+proyecto y se ejecuta desde ahí.
+
+```bash
+sudo mkdir -p /var/alertas
+cd /var/alertas
+curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh -o bootstrap.sh
+chmod a+x bootstrap.sh
+sudo ./bootstrap.sh install
+```
+
+Con terminal interactiva `install.sh` pregunta qué instalar (servicios, puerto,
+dominio, HTTP o HTTPS, CA y credenciales) y guarda las respuestas en
+`config/install.conf`. Sin TTY, como al pipear, hay que pasar las opciones en la
+línea:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh | sudo bash -s -- --services all --domain alertas.ejemplo.com --port 8443 --tls letsencrypt --acme-email ops@ejemplo.com --cf-token-file /root/cf-token.env
 ```
 
-El proyecto puede vivir en cualquier ruta absoluta: `--dir` cambia el destino
-(por defecto `/var/alertas`, como AzuraCast en `/var/AzuraCast`) y `--branch` la
-rama. Los datos quedan dentro de esa misma carpeta (`data/`, `logs/`, `tts/data`),
-así que moverla mueve todo.
+El proyecto puede vivir en cualquier ruta absoluta: la carpeta actual es el
+destino por defecto y `--dir` la cambia (por ejemplo `--dir /srv/alertas`, útil
+cuando se pipea). `--branch` elige la rama. Los datos quedan dentro de esa misma
+carpeta (`data/`, `logs/`, `tts/data`), así que moverla mueve todo.
 
 Cuando los servicios incluyen la cadena TTS (`all` por defecto), `bootstrap.sh`
 baja también `LaionMaou/radio-alertas-tts` y se la entrega al instalador, así que

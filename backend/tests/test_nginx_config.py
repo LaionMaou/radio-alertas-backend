@@ -252,7 +252,10 @@ def test_bootstrap_script_fetches_the_repository() -> None:
     text = path.read_text(encoding="utf-8")
     assert "codeload.github.com" in text, "bootstrap.sh baja el tarball"
     assert "--dir" in text, "sudo limpia el entorno: el destino va por argumento"
-    assert './install.sh "${args[@]}"' in text, "bootstrap.sh pasa los argumentos"
+    assert 'DEST="$(pwd)"' in text, "sin --dir instala en el directorio actual, como AzuraCast"
+    assert "install) ;;" in text, "./bootstrap.sh install es el flujo documentado"
+    assert "./install.sh" in text, "bootstrap.sh ejecuta el instalador"
+    assert "--exclude=./bootstrap.sh" in text, "no se sobrescribe mientras se ejecuta"
     assert "radio-alertas-tts" in text, "bootstrap.sh baja también la cadena TTS"
     assert "--tts-src" in text, "la cadena TTS se le entrega a install.sh con --tts-src"
     if os.name != "nt":

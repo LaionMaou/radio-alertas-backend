@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Arranque de una línea: baja este repo (y la cadena TTS si los servicios la
-# incluyen) y ejecuta install.sh con los mismos argumentos. Pensado para correr
-# sin clonar nada:
-#   curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh \
-#     | sudo bash -s -- --dir /var/alertas --services all --domain alertas.ejemplo.com ...
+# Instalador de arranque: baja este repo (y la cadena TTS si los servicios la
+# incluyen) en el directorio actual y ejecuta install.sh. Mismo flujo que
+# AzuraCast:
+#   mkdir -p /var/alertas && cd /var/alertas
+#   curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh -o bootstrap.sh
+#   chmod a+x bootstrap.sh
+#   sudo ./bootstrap.sh install
+# También se puede pipear, con --dir para elegir la ruta:
+#   curl -fsSL .../bootstrap.sh | sudo bash -s -- --dir /srv/alertas --services all ...
 # Sin TTY no hay asistente: pasá las opciones o dejá config/install.conf.
 set -euo pipefail
 
@@ -11,16 +15,18 @@ REPO_OWNER="LaionMaou"
 REPO_NAME="radio-alertas-backend"
 TTS_OWNER="LaionMaou"
 TTS_NAME="radio-alertas-tts"
-DEST="/var/alertas"
+DEST="$(pwd)"
 BRANCH="main"
 
 die() { printf 'bootstrap: %s\n' "$*" >&2; exit 1; }
 
 usage() {
     cat <<'EOF'
-Uso: curl -fsSL .../bootstrap.sh | sudo bash -s -- [opciones] [opciones de install.sh]
+Uso: sudo ./bootstrap.sh [install] [opciones] [opciones de install.sh]
+     curl -fsSL .../bootstrap.sh | sudo bash -s -- [opciones] [opciones de install.sh]
 
-  --dir RUTA        dónde instalar (absoluta; por defecto /var/alertas)
+  install           subcomando opcional: instala en el directorio actual
+  --dir RUTA        dónde instalar (absoluta; por defecto, el directorio actual)
   --branch NOMBRE   rama del repo a bajar (por defecto main)
   -h, --help        esta ayuda
 
@@ -42,6 +48,7 @@ while [ $# -gt 0 ]; do
             [ $# -ge 2 ] || die "--branch necesita un nombre"
             BRANCH="$2"; shift ;;
         -h|--help) usage; exit 0 ;;
+        install) ;;  # `./bootstrap.sh install`, como docker.sh de AzuraCast
         *) args+=("$1") ;;
     esac
     shift
@@ -51,6 +58,7 @@ case "$DEST" in
     /*) ;;
     *) die "--dir tiene que ser una ruta absoluta: $DEST" ;;
 esac
+[ "$DEST" != "/" ] || die "no instalo en /; usá una carpeta como /var/alertas"
 
 # La cadena TTS vive en otro repo. Si install.sh la va a instalar y no se pasó
 # una copia local, se baja acá y se le entrega con --tts-src.
@@ -73,7 +81,7 @@ case ",$services," in
     *) want_tts=0 ;;
 esac
 
-[ "$(id -u)" -eq 0 ] || die "ejecutá con sudo: curl ... | sudo bash -s -- ..."
+[ "$(id -u)" -eq 0 ] || die "ejecutá con sudo: sudo ./bootstrap.sh install"
 command -v curl >/dev/null 2>&1 || die "falta curl"
 command -v tar >/dev/null 2>&1 || die "falta tar"
 
@@ -91,7 +99,14 @@ curl -fsSL "$url" -o "$tmp/repo.tar.gz" || die "no pude descargar $url"
 mkdir -p "$tmp/src" "$DEST"
 tar -xzf "$tmp/repo.tar.gz" -C "$tmp/src" --strip-components=1 \
     || die "el tarball no se pudo extraer"
-tar -C "$tmp/src" -cf - . | tar -C "$DEST" -xf -
+
+# Si el script corre desde el destino, no se sobrescribe a sí mismo mientras
+# bash todavía lo está leyendo.
+if [ "$(cd "$(dirname "$0")" 2>/dev/null && pwd)" = "$DEST" ]; then
+    tar -C "$tmp/src" -cf - --exclude=./bootstrap.sh . | tar -C "$DEST" -xf -
+else
+    tar -C "$tmp/src" -cf - . | tar -C "$DEST" -xf -
+fi
 chmod +x "$DEST/install.sh" "$DEST"/deploy/*.sh 2>/dev/null || true
 
 if [ "$want_tts" -eq 1 ]; then

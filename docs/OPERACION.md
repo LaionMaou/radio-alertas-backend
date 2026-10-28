@@ -22,15 +22,24 @@ daemon de Docker.
 
 ## 1. Instalación
 
-Sin clonar nada, `bootstrap.sh` baja el repo desde GitHub a la ruta que elijas
-(`--dir`, por defecto `/var/alertas`) y ejecuta el instalador. Al pipear no hay
-TTY, así que las opciones son obligatorias. `install.sh` se instala siempre donde
-esté el proyecto, así que cualquier ruta absoluta sirve:
+Igual que AzuraCast, el instalador se baja dentro de la carpeta elegida:
+
+```bash
+sudo mkdir -p /var/alertas
+cd /var/alertas
+curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh -o bootstrap.sh
+chmod a+x bootstrap.sh
+sudo ./bootstrap.sh install
+```
+
+`bootstrap.sh` baja el repo en el directorio actual (o en `--dir RUTA`, una ruta
+absoluta) y ejecuta `install.sh`, que con TTY arranca el asistente. Al pipear no
+hay TTY, así que ahí las opciones son obligatorias:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh \
-  | sudo bash -s -- --services all --domain alertas.ejemplo.com --port 8443 \
-    --tls letsencrypt --acme-email ops@ejemplo.com --cf-token-file /root/cf-token.env
+  | sudo bash -s -- --dir /srv/alertas --services all --domain alertas.ejemplo.com \
+    --port 8443 --tls letsencrypt --acme-email ops@ejemplo.com --cf-token-file /root/cf-token.env
 ```
 
 Si los servicios incluyen la cadena TTS (`all` por defecto), el bootstrap baja
