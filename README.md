@@ -34,6 +34,7 @@ P2PQuake WS (1 conexión)          JMA (solo por evento / cada 10 min)
 
 ```
 install.sh                instalador para el VPS (estilo AzuraCast)
+bootstrap.sh              baja el repo desde GitHub y ejecuta install.sh
 backend/                  servicio FastAPI (Python 3.11+)
   src/radio_alerts_backend/
   scripts/healthcheck.py
@@ -92,7 +93,16 @@ no se publican en nginx y no deben exponerse nunca a Internet.
 
 ## Despliegue
 
-El proyecto vive en `/var/alertas`, igual que AzuraCast en `/var/AzuraCast`:
+La forma más corta, sin clonar nada: `bootstrap.sh` baja el repo y ejecuta el
+instalador con los argumentos que le pases. Al pipear no hay terminal
+interactiva, así que las opciones van en la línea:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh | sudo bash -s -- --services all --domain alertas.ejemplo.com --port 8443 --tls letsencrypt --acme-email ops@ejemplo.com --cf-token-file /root/cf-token.env
+```
+
+El proyecto vive en `/var/alertas`, igual que AzuraCast en `/var/AzuraCast`
+(`ALERTAS_DIR` cambia el destino y `ALERTAS_BRANCH` la rama):
 
 ```bash
 sudo mkdir -p /var/alertas

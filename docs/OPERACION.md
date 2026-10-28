@@ -22,6 +22,18 @@ daemon de Docker.
 
 ## 1. Instalación
 
+Sin clonar nada, `bootstrap.sh` baja el repo desde GitHub a `/var/alertas` y
+ejecuta el instalador. Al pipear no hay TTY, así que las opciones son
+obligatorias:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh \
+  | sudo bash -s -- --services all --domain alertas.ejemplo.com --port 8443 \
+    --tls letsencrypt --acme-email ops@ejemplo.com --cf-token-file /root/cf-token.env
+```
+
+Con el proyecto ya subido al VPS:
+
 ```bash
 sudo mkdir -p /var/alertas
 sudo rsync -a --exclude .git --exclude .venv ./ /var/alertas/

@@ -245,6 +245,17 @@ def test_installer_never_publishes_azuracast_ports_silently() -> None:
     assert "8443" in text, "HTTPS tiene que usar un puerto propio por defecto"
 
 
+def test_bootstrap_script_fetches_the_repository() -> None:
+    path = ROOT / "bootstrap.sh"
+
+    assert path.is_file()
+    text = path.read_text(encoding="utf-8")
+    assert "codeload.github.com" in text, "bootstrap.sh baja el tarball"
+    assert 'exec ./install.sh "$@"' in text, "bootstrap.sh pasa los argumentos"
+    if os.name != "nt":
+        assert path.stat().st_mode & 0o111, "bootstrap.sh tiene que ser ejecutable"
+
+
 def test_acme_helpers_are_present() -> None:
     for name in ("acme-reload.sh", "acme-renew.sh"):
         path = ROOT / "deploy" / name
