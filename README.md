@@ -1,5 +1,10 @@
 # Backend de alertas P2P/JMA
 
+**© 2026 FF Argentum. Todos los derechos reservados.**
+Software propietario de FF Argentum, desarrollo propio. No es código abierto:
+no se puede copiar, redistribuir ni reutilizar sin autorización previa y por
+escrito. Ver [LICENSE](LICENSE).
+
 Servicio que escucha los avisos sísmicos y de tsunami de P2PQuake, los enriquece
 con datos de la JMA, decide si corresponde anunciarlos y dispara la cadena TTS
 (`radio-alerts-tts`). Incluye una página estática para que los locutores vean el
@@ -7,6 +12,32 @@ estado sin llamar nunca a P2P ni a la JMA.
 
 Este repositorio es independiente de la app de Kuma y de la cadena TTS. La cadena
 TTS se reutiliza por HTTP; aquí no se duplica Kokoro, ffmpeg ni WebDJ.
+
+## Qué hace el sistema
+
+Es el cerebro de las alertas de la radio en japonés. Recibe la información,
+decide si merece cortar la programación, la convierte en texto y la manda a la
+cadena de voz. La locución suena por AzuraCast y, cuando corresponde, queda en
+bucle hasta que un locutor la detiene.
+
+- **Escucha una sola conexión** a P2PQuake (límite de 2 por IP) con backoff
+  exponencial: EEW, 地震情報, 津波情報 y 台風情報. Nunca sondea en paralelo.
+- **Enriquece con la JMA** por evento o, como respaldo, cada 5–10 minutos.
+- **Decide con umbrales configurables**: 震度 mínimo, magnitud mínima, grado de
+  tsunami, y para tifones área + probabilidad. Un evento que no cruza el umbral
+  queda visible en el portal pero no suena.
+- **Anuncia una vez por escalada**: cada evento guarda el `rank` ya anunciado,
+  así una réplica del mismo informe no vuelve a cortar el aire.
+- **Bucle solo para 大津波警報** (`MajorWarning`): el resto de las alertas suena
+  una vez. El texto incluye la instrucción de evacuar.
+- **Stop para el locutor** en el portal: barra visible únicamente mientras hay
+  bucle, con confirmación de dos pasos y una cuenta por persona
+  (`deploy/operators.sh`). Al detenerlo, AzuraCast recupera el AutoDJ.
+- **Portal estático** con tarjeta de la alerta activa, historial y SSE, sin
+  frameworks, sin CDN y sin llamar nunca a P2P ni a la JMA: todo pasa por este
+  backend.
+- **Estado observable**: `/health` informa P2P, JMA, TTS y store; los eventos se
+  guardan en JSONL por día con retención de 30 días.
 
 ## Arquitectura
 
@@ -51,6 +82,9 @@ deploy/nginx/snippets/    headers y proxy compartidos por las dos variantes
 deploy/nginx/radio-alerts-tls.conf  variante HTTPS (listen 443 ssl)
 deploy/acme-reload.sh     recarga nginx tras emitir/renovar el certificado
 deploy/acme-renew.sh      renovación diaria (la llama /etc/cron.d/radio-alertas)
+deploy/operators.sh       alta, baja y listado de locutores (basic auth)
+config/nginx/operator.htpasswd  cuentas de locutores (no versionado)
+LICENSE                   licencia propietaria de FF Argentum
 ```
 
 ## Desarrollo local
@@ -77,6 +111,8 @@ consulta ningún servicio externo.
 | GET | `/api/alert/history?limit=20&kind=` | 1..50; `{"alerts": [...], "count": n}` |
 | GET | `/api/alert/stream` | SSE: `snapshot`, `alert`, `status`; `retry: 5000` |
 | GET | `/health` | `status=ok|degraded`, estado P2P/JMA/TTS/store |
+| POST | `/api/stop` | Única ruta pública de escritura; nginx exige basic auth de operador y la proxya al interno |
+| POST | `/internal/stop-tts` | Bearer; corta el bucle y limpia `loop_active`. Nunca se publica |
 | POST | `/internal/trigger-tts` | Bearer `INTERNAL_TOKEN`; respeta `DRY_RUN` |
 | POST | `/internal/simulate` | Solo con `ENABLE_SIMULATE=true`; Bearer |
 
@@ -90,6 +126,28 @@ no se publican en nginx y no deben exponerse nunca a Internet.
 - SSE contra `api/alert/stream`; si falla tres veces pasa a `fetch` cada 10 s.
 - Todo el DOM se construye con `textContent`/`createElement`; nunca `innerHTML`.
 - Sin frameworks, sin CDN, sin fuentes externas. CSP en `deploy/nginx`.
+- La **barra de stop** aparece arriba (empuja el contenido, no lo tapa) solo
+  mientras el backend informa `tts.loop_active: true`. Se confirma en dos pasos
+  en el mismo botón (`取消` o `Escape` cancelan) y, al detener el bucle, el
+  AutoDJ vuelve solo.
+
+## Operadores
+
+Cada locutor tiene su propio usuario y contraseña para el botón de stop; se
+puede dar de baja a una persona sin tocar al resto. El hash vive en
+`config/nginx/operator.htpasswd` (no versionado) y nginx lo relee en cada
+petición.
+
+```bash
+cd /var/alertas
+sudo ./deploy/operators.sh add locutor1     # pide la contraseña dos veces
+sudo ./deploy/operators.sh list             # usuarios, nunca los hashes
+sudo ./deploy/operators.sh remove locutor1
+```
+
+La contraseña no se imprime ni pasa por argumentos; el script valida y recarga
+nginx al terminar. El navegador pide las credenciales la primera vez y las
+recuerda durante la sesión.
 
 ## Despliegue
 
@@ -231,4 +289,16 @@ El contenedor TTS debe estar en la misma red `radio-alerts` y usar el mismo
 
 ## Estado
 
-`DRY_RUN=true` en ambos servicios hasta completar la prueba de tono autorizada.
+`DRY_RUN=true` es el valor por defecto del repositorio: no suena nada hasta
+ponerlo en `false` en `config/.env` y `tts/.env`, con `INTERNAL_TOKEN` y
+`TTS_API_TOKEN` definidos. La instalación de prueba en el VPS (`/var/alertas`)
+corre a propósito con `DRY_RUN=false`.
+
+## Licencia
+
+Software propietario de FF Argentum, © 2026. Todos los derechos reservados.
+
+Este es un desarrollo propio y no un proyecto de código abierto. No se permite
+copiar, modificar, publicar, redistribuir ni usar el código, la documentación o
+los recursos gráficos sin autorización previa y por escrito de FF Argentum. El
+texto completo está en [LICENSE](LICENSE).
