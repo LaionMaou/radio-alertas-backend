@@ -80,7 +80,7 @@ usage() {
     cat <<'EOF'
 Instalador del stack de alertas para el VPS.
 
-  cd /var/alertas
+  cd <directorio del proyecto>
   sudo ./install.sh
 
 Opciones:

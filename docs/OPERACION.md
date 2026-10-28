@@ -22,9 +22,10 @@ daemon de Docker.
 
 ## 1. Instalación
 
-Sin clonar nada, `bootstrap.sh` baja el repo desde GitHub a `/var/alertas` y
-ejecuta el instalador. Al pipear no hay TTY, así que las opciones son
-obligatorias:
+Sin clonar nada, `bootstrap.sh` baja el repo desde GitHub a la ruta que elijas
+(`--dir`, por defecto `/var/alertas`) y ejecuta el instalador. Al pipear no hay
+TTY, así que las opciones son obligatorias. `install.sh` se instala siempre donde
+esté el proyecto, así que cualquier ruta absoluta sirve:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh \
@@ -299,6 +300,10 @@ docker compose -f deploy/docker-compose.yml exec backend python scripts/healthch
   el mismo evento.
 - Actualizar: `git pull && docker compose -f deploy/docker-compose.yml up -d
   --build` (sin `down -v`, sin borrar volúmenes).
+- No hay volúmenes nombrados de Docker con estado: `data/`, `logs/` y `tts/data/`
+  son bind mounts dentro del directorio de instalación (dueño `10001`). El backup
+  es un `tar` de esa carpeta y mover el stack es mover la carpeta completa; si se
+  reinstala en otra ruta, los datos no se copian solos.
 
 ## 9. Límites que no se tocan
 

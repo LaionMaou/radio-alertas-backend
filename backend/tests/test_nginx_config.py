@@ -251,7 +251,8 @@ def test_bootstrap_script_fetches_the_repository() -> None:
     assert path.is_file()
     text = path.read_text(encoding="utf-8")
     assert "codeload.github.com" in text, "bootstrap.sh baja el tarball"
-    assert 'exec ./install.sh "$@"' in text, "bootstrap.sh pasa los argumentos"
+    assert "--dir" in text, "sudo limpia el entorno: el destino va por argumento"
+    assert 'exec ./install.sh "${args[@]}"' in text, "bootstrap.sh pasa los argumentos"
     if os.name != "nt":
         assert path.stat().st_mode & 0o111, "bootstrap.sh tiene que ser ejecutable"
 

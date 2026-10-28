@@ -101,8 +101,16 @@ interactiva, así que las opciones van en la línea:
 curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh | sudo bash -s -- --services all --domain alertas.ejemplo.com --port 8443 --tls letsencrypt --acme-email ops@ejemplo.com --cf-token-file /root/cf-token.env
 ```
 
-El proyecto vive en `/var/alertas`, igual que AzuraCast en `/var/AzuraCast`
-(`ALERTAS_DIR` cambia el destino y `ALERTAS_BRANCH` la rama):
+El proyecto puede vivir en cualquier ruta absoluta: `--dir` cambia el destino
+(por defecto `/var/alertas`, como AzuraCast en `/var/AzuraCast`) y `--branch` la
+rama. Los datos quedan dentro de esa misma carpeta (`data/`, `logs/`, `tts/data`),
+así que moverla mueve todo.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh | sudo bash -s -- --dir /srv/alertas --services backend,web
+```
+
+Equivalente manual, con el proyecto ya subido a `/var/alertas`:
 
 ```bash
 sudo mkdir -p /var/alertas
