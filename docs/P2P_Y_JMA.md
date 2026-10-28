@@ -87,6 +87,55 @@ borrador inicial, que los ordenaba como `46→45` y `99→75`: tratar `99` como 
 `Unknown = None = NonEffective = 0`, `Watch = 1`, `Warning = 2`,
 `MajorWarning = 3`.
 
+## Textos que salen al aire
+
+### 556 — EEW
+
+La intro se dice **siempre y dos veces**, después la variante por intensidad y al
+final los datos (震源・規模・震度, sin hora):
+
+```
+緊急地震速報です。強い揺れに警戒してください。
+緊急地震速報です。強い揺れに警戒してください。
+<variante>
+震源は{epicentro}。マグニチュード{magnitud}。最大震度{label}。
+```
+
+| `max_intensity.value` | Variante |
+| --- | --- |
+| `70` | `大地震です。大地震です。身の安全を確保してください。` |
+| `55` / `60` (6弱, 6強) | `緊急地震速報です。落ち着いて行動してください。まもなく地震が来ます。` |
+| resto | sin variante |
+
+Para `46` y `99` la oración de intensidad es `最大震度{label}と予想されます。`
+(`99` se renderiza como 5弱, nunca como 7). Si falta epicentro, magnitud o
+intensidad, se omite esa cláusula.
+
+### 552 — tsunami
+
+| `grade` | Texto |
+| --- | --- |
+| `MajorWarning` | `大津波警報が発表されました。海岸付近の方は高台に避難してください。` (fijo, sin áreas) |
+| `Warning` / `Watch` | Etiqueta, áreas afectadas y la acción correspondiente |
+
+Una `MajorWarning` no se anuncia una vez: **corta lo que esté sonando y repite el
+texto hasta que un operador lo detenga** (o llegue otra alerta, que lo reemplaza).
+El comando de stop está en el README del TTS.
+
+### Gravedad enviada al TTS
+
+`policy.decide()` deriva tres campos del evento y los manda en el payload:
+
+| Campo | Cuándo |
+| --- | --- |
+| `tone = "urgent"` | EEW o 地震情報 con `scale_code >= 70`, o tsunami `MajorWarning` |
+| `tone = "soft"` | Todo lo demás |
+| `loop` y `preempt` | Solo `kind = tsunami` con `MajorWarning` |
+
+Un 551 con `domestic: MajorWarning` también usa `urgent`, pero no entra en bucle:
+el bucle es exclusivo del grado mayor de un 552. `loop`, `tone` y `preempt` quedan
+en `announcement` dentro del evento, así que sobreviven al reinicio.
+
 ## JMA
 
 | Recurso | URL | Uso |

@@ -179,6 +179,8 @@ class Pipeline:
                 "rank": decision.rank,
                 "announce": decision.announce,
                 "reason": decision.reason,
+                "tone": decision.tone,
+                "loop": decision.loop,
             },
         )
         if not decision.announce:
@@ -189,12 +191,17 @@ class Pipeline:
             event,
             text=text,
             dedupe_key=decision.dedupe_key,
+            tone=decision.tone,
+            loop=decision.loop,
+            preempt=decision.preempt,
         )
         announcement = make_announcement(
             version=event.version,
             rank=decision.rank,
             alert_id=outcome.alert_id,
             status=outcome.status.value,
+            tone=decision.tone,
+            loop=decision.loop,
         )
         updated = await self.store.record_announcement(event.event_key, announcement)
         return updated or event

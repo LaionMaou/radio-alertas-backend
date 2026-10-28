@@ -12,7 +12,10 @@ def event(kind: EventKind, **kwargs) -> Event:
     return Event(event_key=f"{kind.value}:1", kind=kind, issued_at=ISSUED, **kwargs)
 
 
-def test_eew_text() -> None:
+INTRO = "緊急地震速報です。強い揺れに警戒してください。"
+
+
+def test_eew_text_repeats_the_intro_and_lists_the_data() -> None:
     item = event(
         EventKind.EEW,
         epicenter={"name": "宮城県沖", "magnitude": 7.2},
@@ -21,8 +24,8 @@ def test_eew_text() -> None:
     )
 
     assert render(item) == (
-        "緊急地震速報。宮城県沖で強い揺れが予想されます。"
-        "最大震度5強。マグニチュード7.2。強い揺れに警戒してください。"
+        f"{INTRO}{INTRO}"
+        "震源は宮城県沖。マグニチュード7.2。最大震度5強。"
     )
 
 
@@ -37,6 +40,46 @@ def test_eew_open_ended_scale_never_renders_99() -> None:
     text = render(item)
     assert "99" not in text
     assert "最大震度5弱以上と予想されます。" in text
+    assert "大地震です" not in text, (
+        "99 es una intensidad abierta (5弱以上), no un 震度7"
+    )
+
+
+def test_eew_six_strong_asks_to_stay_calm() -> None:
+    item = event(
+        EventKind.EEW,
+        epicenter={"name": "宮城県沖", "magnitude": 7.2},
+        max_intensity={"value": 60, "label": "6強"},
+    )
+
+    assert render(item) == (
+        f"{INTRO}{INTRO}"
+        "緊急地震速報です。落ち着いて行動してください。まもなく地震が来ます。"
+        "震源は宮城県沖。マグニチュード7.2。最大震度6強。"
+    )
+
+
+def test_eew_seven_warns_of_a_major_earthquake() -> None:
+    item = event(
+        EventKind.EEW,
+        epicenter={"name": "宮城県沖", "magnitude": 7.2},
+        max_intensity={"value": 70, "label": "7"},
+    )
+
+    assert render(item) == (
+        f"{INTRO}{INTRO}"
+        "大地震です。大地震です。身の安全を確保してください。"
+        "震源は宮城県沖。マグニチュード7.2。最大震度7。"
+    )
+
+
+def test_eew_without_intensity_keeps_only_the_intro_and_the_data() -> None:
+    item = event(
+        EventKind.EEW,
+        epicenter={"name": "宮城県沖"},
+    )
+
+    assert render(item) == f"{INTRO}{INTRO}震源は宮城県沖。"
 
 
 def test_quake_text_without_tsunami_risk() -> None:
@@ -108,14 +151,30 @@ def test_tsunami_warning_text() -> None:
     )
 
 
-def test_tsunami_major_warning_text() -> None:
+def test_tsunami_major_warning_text_is_fixed_regardless_of_areas() -> None:
     item = event(
         EventKind.TSUNAMI,
-        tsunami={"grade": "MajorWarning", "areas": [{"name": "宮城県", "grade": "MajorWarning"}]},
+        tsunami={
+            "grade": "MajorWarning",
+            "areas": [{"name": "宮城県", "grade": "MajorWarning"}],
+        },
     )
 
     assert render(item) == (
-        "大津波警報。宮城県に大津波警報が発表されました。直ちに高台へ避難してください。"
+        "大津波警報が発表されました。海岸付近の方は高台に避難してください。"
+    )
+
+
+def test_quake_with_major_tsunami_does_not_stay_silent() -> None:
+    item = event(
+        EventKind.EARTHQUAKE,
+        origin_at=datetime(2026, 10, 25, 3, 59, tzinfo=UTC),
+        max_intensity={"value": 60, "label": "6強"},
+        tsunami={"domestic": "MajorWarning"},
+    )
+
+    assert render(item).endswith(
+        "大津波警報が発表されています。直ちに高台へ避難してください。"
     )
 
 
@@ -182,5 +241,5 @@ def test_long_names_do_not_cut_sentences() -> None:
 
     text = render(item)
     assert len(text) <= MAX_CHARS
-    assert text.endswith("強い揺れに警戒してください。")
+    assert text.endswith("最大震度5強。")
     assert "…" in text

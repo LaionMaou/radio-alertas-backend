@@ -39,6 +39,7 @@ class Policy:
         if announced and rank <= announced:
             return self._no(event, rank, "no_escalation")
 
+        loop = event.kind == EventKind.TSUNAMI and _major_tsunami(event)
         return Decision(
             announce=True,
             rank=rank,
@@ -46,6 +47,9 @@ class Policy:
             reason="escalation" if announced else "initial",
             text=render(event),
             dedupe_key=dedupe_key(event.kind.value, event.event_key, rank),
+            tone="urgent" if loop or _severe_shaking(event) else "soft",
+            loop=loop,
+            preempt=loop,
         )
 
     def rank(self, event: Event) -> int:
@@ -130,6 +134,17 @@ class Policy:
             version=event.version,
             reason=reason,
         )
+
+
+def _major_tsunami(event: Event) -> bool:
+    data = event.tsunami or {}
+    return str(data.get("grade") or data.get("domestic") or "") == "MajorWarning"
+
+
+def _severe_shaking(event: Event) -> bool:
+    if event.kind not in (EventKind.EEW, EventKind.EARTHQUAKE):
+        return False
+    return scale_code((event.max_intensity or {}).get("value")) >= 70
 
 
 def _usable_scale(intensity: dict[str, Any] | None) -> int | None:

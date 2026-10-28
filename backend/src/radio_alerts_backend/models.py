@@ -181,6 +181,9 @@ class Decision:
     reason: str
     text: str | None = None
     dedupe_key: str = ""
+    tone: str = "soft"
+    loop: bool = False
+    preempt: bool = False
 
 
 @dataclass
@@ -215,6 +218,8 @@ def make_announcement(
     alert_id: str | None,
     status: str,
     at: datetime | None = None,
+    tone: str = "soft",
+    loop: bool = False,
 ) -> dict[str, Any]:
     return {
         "version": int(version),
@@ -222,4 +227,6 @@ def make_announcement(
         "alert_id": alert_id,
         "status": status,
         "at": iso_z(at or utcnow()),
+        "tone": tone,
+        "loop": bool(loop),
     }

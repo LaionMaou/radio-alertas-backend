@@ -25,6 +25,7 @@ _KIND_MAP = {
 
 _RESULT_STATUS = {
     "ok": TtsStatus.OK,
+    "stopped": TtsStatus.OK,
     "dry-run": TtsStatus.DRY_RUN,
     "partial": TtsStatus.PARTIAL,
     "failed": TtsStatus.FAILED,
@@ -75,7 +76,16 @@ class TtsClient:
             transport=transport,
         )
 
-    async def submit(self, event: Event, *, text: str, dedupe_key: str) -> SubmitOutcome:
+    async def submit(
+        self,
+        event: Event,
+        *,
+        text: str,
+        dedupe_key: str,
+        tone: str = "soft",
+        loop: bool = False,
+        preempt: bool = False,
+    ) -> SubmitOutcome:
         if self.settings.dry_run:
             await self.store.update_tts(
                 event.event_key,
@@ -92,13 +102,18 @@ class TtsClient:
             )
             return SubmitOutcome(status=TtsStatus.DRY_RUN)
 
-        payload = {
+        payload: dict[str, Any] = {
             "text": text,
             "kind": _KIND_MAP.get(event.kind, "other"),
             "magnitude": (event.epicenter or {}).get("magnitude"),
             "title": _title(event),
             "dedupe_key": dedupe_key,
+            "tone": tone,
         }
+        if loop:
+            payload["loop"] = True
+        if preempt:
+            payload["preempt"] = True
         async with self._lock:
             return await self._submit_locked(event.event_key, payload)
 

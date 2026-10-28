@@ -142,7 +142,36 @@ async def test_accepted_alert_is_polled_until_result(tmp_path) -> None:
         "magnitude": 7.2,
         "title": "地震情報",
         "dedupe_key": "k",
+        "tone": "soft",
     }
+
+
+async def test_major_tsunami_payload_asks_for_urgent_loop_and_preempt(tmp_path) -> None:
+    item = event(event_key="tsunami:1", kind=EventKind.TSUNAMI, title="大津波警報")
+    store = await make_store(tmp_path, item)
+    recorder = Recorder(
+        {
+            ("POST", "/alert"): httpx.Response(202, json={"alert_id": "a1", "status": "queued"}),
+            ("GET", "/alert/a1"): httpx.Response(200, json={"status": "stopped", "error": None}),
+        }
+    )
+    client = TtsClient(settings(), store, transport=httpx.MockTransport(recorder))
+
+    await client.submit(
+        item,
+        text="大津波警報が発表されました。",
+        dedupe_key="k",
+        tone="urgent",
+        loop=True,
+        preempt=True,
+    )
+    await client.wait_pending()
+    await client.aclose()
+
+    payload = recorder.payloads()[0]
+    assert payload["tone"] == "urgent"
+    assert payload["loop"] is True
+    assert payload["preempt"] is True
 
 
 async def test_duplicate_without_stored_result_keeps_duplicate_status(tmp_path) -> None:

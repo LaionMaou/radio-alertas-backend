@@ -5,9 +5,14 @@ from collections.abc import Sequence
 from typing import Any
 
 from .models import Event, EventKind
-from .normalize import format_jst_time
+from .normalize import format_jst_time, scale_code
 
 MAX_CHARS = 280
+
+_EEW_INTRO = "緊急地震速報です。強い揺れに警戒してください。"
+_EEW_MAJOR = "大地震です。大地震です。身の安全を確保してください。"
+_EEW_STRONG = "緊急地震速報です。落ち着いて行動してください。まもなく地震が来ます。"
+_MAJOR_TSUNAMI = "大津波警報が発表されました。海岸付近の方は高台に避難してください。"
 
 _TSUNAMI_LABELS = {
     "MajorWarning": "大津波警報",
@@ -26,6 +31,7 @@ _QUAKE_TSUNAMI_SENTENCES = {
     "NonEffective": "津波の心配はありません。",
     "Watch": "津波注意報が発表されています。海から離れてください。",
     "Warning": "津波警報が発表されています。海岸から離れてください。",
+    "MajorWarning": "大津波警報が発表されています。直ちに高台へ避難してください。",
     "Unknown": "津波情報を確認してください。",
     "Checking": "津波情報を確認してください。",
 }
@@ -44,21 +50,37 @@ def render(event: Event) -> str:
 
 
 def _eew(event: Event) -> str:
+    pieces = (
+        _EEW_INTRO,
+        _EEW_INTRO,
+        _eew_variant(event.max_intensity),
+        _eew_data(event),
+    )
+    return _compose([(piece, False) for piece in pieces if piece])
+
+
+def _eew_variant(intensity: dict[str, Any] | None) -> str:
+    code = scale_code((intensity or {}).get("value"))
+    if code >= 70:
+        return _EEW_MAJOR
+    if 55 <= code <= 60:
+        return _EEW_STRONG
+    return ""
+
+
+def _eew_data(event: Event) -> str:
     epicenter = event.epicenter or {}
-    eew = event.eew or {}
-    name = _clip(epicenter.get("name") or _first_area_name(eew.get("areas")) or "各地")
-    parts: list[tuple[str, bool]] = [
-        ("緊急地震速報。", False),
-        (f"{name}で強い揺れが予想されます。", False),
-    ]
-    intensity = _intensity_sentence(event.max_intensity)
-    if intensity:
-        parts.append((intensity, False))
+    pieces: list[str] = []
+    name = _clip(epicenter.get("name") or "", 24)
+    if name:
+        pieces.append(f"震源は{name}。")
     magnitude = _magnitude(epicenter)
     if magnitude is not None:
-        parts.append((f"マグニチュード{magnitude}。", True))
-    parts.append(("強い揺れに警戒してください。", False))
-    return _compose(parts)
+        pieces.append(f"マグニチュード{magnitude}。")
+    intensity = _intensity_sentence(event.max_intensity)
+    if intensity:
+        pieces.append(intensity)
+    return "".join(pieces)
 
 
 def _quake(event: Event) -> str:
@@ -85,6 +107,8 @@ def _quake(event: Event) -> str:
 def _tsunami(event: Event) -> str:
     data = event.tsunami or {}
     grade = str(data.get("grade") or data.get("domestic") or "Unknown")
+    if grade == "MajorWarning":
+        return _MAJOR_TSUNAMI
     label = _TSUNAMI_LABELS.get(grade, "津波情報")
     action = _TSUNAMI_ACTIONS.get(grade, "最新の情報を確認してください。")
     area_text = _tsunami_areas(data.get("areas"), grade)
@@ -192,17 +216,6 @@ def _tsunami_areas(areas: Any, grade: str) -> str:
     if len(names) <= 3:
         return "、".join(names)
     return "、".join(names[:3]) + f"ほか{len(names) - 3}地域"
-
-
-def _first_area_name(areas: Any) -> str:
-    if not isinstance(areas, list):
-        return ""
-    for area in areas:
-        if isinstance(area, dict):
-            name = str(area.get("name") or area.get("pref") or "").strip()
-            if name:
-                return name
-    return ""
 
 
 def _magnitude(epicenter: dict[str, Any]) -> str | None:

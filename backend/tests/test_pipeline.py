@@ -139,6 +139,40 @@ async def test_quake_is_announced_and_recorded(tmp_path) -> None:
     await tts.aclose()
 
 
+async def test_moderate_eew_uses_the_soft_lead_in(tmp_path) -> None:
+    pipeline, _, tts = await make_pipeline(tmp_path)
+
+    event = await pipeline.handle_p2p(quake_payload(p2p_id="q7", max_scale=60))
+
+    assert event is not None
+    assert event.announcements[-1]["tone"] == "soft"
+    assert event.announcements[-1]["loop"] is False
+    await tts.aclose()
+
+
+async def test_seven_eew_uses_the_urgent_lead_in(tmp_path) -> None:
+    pipeline, _, tts = await make_pipeline(tmp_path)
+
+    event = await pipeline.handle_p2p(quake_payload(p2p_id="q8", max_scale=70))
+
+    assert event is not None
+    assert event.announcements[-1]["tone"] == "urgent"
+    await tts.aclose()
+
+
+async def test_major_tsunami_loops_until_an_operator_stops_it(tmp_path) -> None:
+    pipeline, _, tts = await make_pipeline(tmp_path)
+    payload = tsunami_payload()
+    payload["areas"] = [{"name": "宮城県", "grade": "MajorWarning", "immediate": True}]
+
+    event = await pipeline.handle_p2p(payload)
+
+    assert event is not None
+    assert event.announcements[-1]["tone"] == "urgent"
+    assert event.announcements[-1]["loop"] is True
+    await tts.aclose()
+
+
 async def test_low_quake_is_stored_without_announcement(tmp_path) -> None:
     pipeline, store, tts = await make_pipeline(tmp_path)
 
