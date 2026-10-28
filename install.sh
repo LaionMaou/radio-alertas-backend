@@ -930,6 +930,19 @@ fi
 if [ "$WEB" -eq 1 ]; then
     if container_running kuma-alerts-web; then
         ok "web (nginx) corriendo"
+        # En una actualización la web no se recrea (misma imagen, config montada),
+        # así que sin esto nginx sigue sirviendo el site.conf anterior.
+        if docker exec kuma-alerts-web nginx -t >/dev/null 2>&1; then
+            if docker exec kuma-alerts-web nginx -s reload >/dev/null 2>&1; then
+                ok "nginx recargado con el site.conf nuevo"
+            else
+                FAILURES=$((FAILURES + 1))
+                warn "nginx no recargó; revisá: docker logs kuma-alerts-web"
+            fi
+        else
+            FAILURES=$((FAILURES + 1))
+            warn "nginx rechazó el site.conf renderizado; la web sigue con la config anterior"
+        fi
     else
         FAILURES=$((FAILURES + 1))
         warn "la web no está corriendo; revisá: docker logs kuma-alerts-web"

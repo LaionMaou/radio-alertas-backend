@@ -170,6 +170,17 @@ def test_installer_renders_the_internal_token_and_the_operator_file() -> None:
     )
 
 
+def test_installer_reloads_nginx_after_rendering() -> None:
+    text = (ROOT / "install.sh").read_text(encoding="utf-8")
+
+    assert "docker exec kuma-alerts-web nginx -t" in text, (
+        "hay que validar el site.conf dentro del contenedor antes de recargar"
+    )
+    assert "docker exec kuma-alerts-web nginx -s reload" in text, (
+        "una actualización no recrea la web: sin recarga nginx sirve la config vieja"
+    )
+
+
 def test_operators_script_manages_accounts_per_announcer() -> None:
     path = ROOT / "deploy" / "operators.sh"
     assert path.is_file(), "falta deploy/operators.sh"
