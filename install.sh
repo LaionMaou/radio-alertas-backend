@@ -735,10 +735,12 @@ issue_certificate() {
         . "$ACME_GTS_ENV"
         set +a
         "$ACME_BIN" --register-account -m "$ACME_EMAIL" --server "$ca_server" \
+            --home "$ACME_HOME" --config-home "$ACME_HOME" \
             --eab-kid "$GTS_EAB_KID" --eab-hmac-key "$GTS_EAB_HMAC_KEY" >/dev/null
         unset GTS_EAB_HMAC_KEY GTS_EAB_KID
     else
-        "$ACME_BIN" --register-account -m "$ACME_EMAIL" --server "$ca_server" >/dev/null
+        "$ACME_BIN" --register-account -m "$ACME_EMAIL" --server "$ca_server" \
+            --home "$ACME_HOME" --config-home "$ACME_HOME" >/dev/null
     fi
 
     log "Emitiendo el certificado para $DOMAIN (DNS-01 en $ACME_DNS)"
@@ -747,6 +749,7 @@ issue_certificate() {
     . "$ACME_CF_ENV"
     set +a
     if ! "$ACME_BIN" --issue --server "$ca_server" -d "$DOMAIN" --dns dns_cf \
+            --home "$ACME_HOME" --config-home "$ACME_HOME" \
             --keylength ec-256 ${force:+$force} >>"$ACME_LOG" 2>&1; then
         unset CF_Token
         warn "últimas líneas del intento de emisión:"
@@ -756,6 +759,7 @@ issue_certificate() {
     unset CF_Token
 
     "$ACME_BIN" --install-cert -d "$DOMAIN" --ecc \
+        --home "$ACME_HOME" --config-home "$ACME_HOME" \
         --fullchain-file "$CERTS_DIR/fullchain.pem" \
         --key-file "$CERTS_DIR/key.pem" \
         --reloadcmd "$BASE_DIR/deploy/acme-reload.sh" >/dev/null

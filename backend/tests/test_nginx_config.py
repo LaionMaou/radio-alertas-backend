@@ -100,6 +100,15 @@ def _variants() -> list[str]:
     return [_nginx(), _nginx_tls()]
 
 
+def test_nginx_templates_keep_set_inside_the_server_block() -> None:
+    for text in _variants():
+        preamble = text.split("\nserver {", 1)[0]
+
+        assert "set " not in preamble, (
+            "los archivos de conf.d viven en el contexto http, donde `set` no existe"
+        )
+
+
 def test_nginx_blocks_internal_endpoints() -> None:
     for text in _variants():
         blocks = _location_blocks(text)
@@ -286,6 +295,10 @@ def test_installer_pins_the_acme_release_and_names_it_on_failure() -> None:
     assert "acme.sh/archive/refs/tags/" in text, "acme.sh se fija por tag, no por master"
     assert "no pude descargar acme.sh: $ACME_URL" in text, (
         "si el tag desaparece, el error tiene que mostrar la URL que falló"
+    )
+    assert text.count('--home "$ACME_HOME" --config-home "$ACME_HOME"') >= 4, (
+        "registro, emisión e instalación del certificado tienen que usar el home "
+        "de config/acme, igual que el cron de renovación"
     )
 
 
