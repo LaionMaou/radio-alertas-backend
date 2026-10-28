@@ -163,7 +163,7 @@ env_set() {
 
 is_placeholder() {
     case "$1" in
-        ""|cambiar-por-un-token|changeme) return 0 ;;
+        ""|cambiar-*|changeme*) return 0 ;;
     esac
     return 1
 }

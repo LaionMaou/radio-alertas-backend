@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 import os
 import re
 from pathlib import Path
@@ -303,6 +304,23 @@ def test_installer_pins_the_acme_release_and_names_it_on_failure() -> None:
     assert "no pude copiar el certificado a config/certs" in text, (
         "--install-cert fallando no puede reportarse como instalación correcta"
     )
+
+
+def test_installer_regenerates_every_example_token() -> None:
+    text = (ROOT / "install.sh").read_text(encoding="utf-8")
+    body = text.split("is_placeholder() {", 1)[1].split("}", 1)[0]
+    patterns = [
+        part.strip().strip('"')
+        for part in next(line for line in body.splitlines() if "return 0" in line)
+        .split(")")[0]
+        .split("|")
+    ]
+
+    for value in ("", "cambiar-por-un-token-largo", "cambiar-esto", "changeme"):
+        assert any(fnmatch.fnmatchcase(value, pattern) for pattern in patterns), (
+            f"{value!r} tiene que contar como placeholder: es un valor público del "
+            "repositorio y no puede quedar como secreto de la API"
+        )
 
 
 def test_acme_helpers_are_present() -> None:
