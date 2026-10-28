@@ -141,6 +141,22 @@ está corriendo), crea la red `radio-alerts`, genera `INTERNAL_TOKEN` y el
 `API_TOKEN` compartido, construye y levanta todo, y espera el `healthy` de cada
 servicio. Se puede reejecutar sin pisar `config/.env`, `tts/.env` ni `data/`.
 
+### Actualizar
+
+Igual que AzuraCast, desde la carpeta de la instalación:
+
+```bash
+cd /var/alertas
+sudo ./bootstrap.sh update-self   # actualiza este script
+sudo ./bootstrap.sh update        # baja el código nuevo y reconstruye
+```
+
+`update` vuelve a bajar el backend (y el TTS si está instalado), copia el código
+sobre la instalación sin tocar `config/.env`, `tts/.env`, `data/`, `logs/` ni
+`config/install.conf`, y reejecuta `install.sh --non-interactive`: reconstruye
+las imágenes y reinicia solo los servicios ya elegidos. `update-self` no toca la
+instalación, solo el script.
+
 Sin flags y con terminal interactiva pregunta qué instalar; las respuestas
 quedan en `config/install.conf` (0600) y los reejecutados las reusan. Para
 cambiarlas: `sudo ./install.sh --configure`. Todo lo demás es equivalente pero

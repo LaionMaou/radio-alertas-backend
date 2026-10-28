@@ -168,7 +168,9 @@ networks:
 
 ## 2. Rearranque y actualización
 
-El script ya deja todo levantado. Para reconstruir tras cambiar código:
+El script ya deja todo levantado. Para traer la última versión publicada está
+`sudo ./bootstrap.sh update` (sección 8). Para reconstruir tras cambiar código a
+mano:
 
 ```bash
 docker compose --env-file config/install.conf -f deploy/docker-compose.yml up -d --build
@@ -311,8 +313,11 @@ docker compose -f deploy/docker-compose.yml exec backend python scripts/healthch
 - Logs de Docker: 10 MB × 3 por contenedor.
 - Al reiniciar, el backend reproduce los últimos 500 registros para no reanunciar
   el mismo evento.
-- Actualizar: `git pull && docker compose -f deploy/docker-compose.yml up -d
-  --build` (sin `down -v`, sin borrar volúmenes).
+- Actualizar, como AzuraCast: `cd /var/alertas && sudo ./bootstrap.sh
+  update-self && sudo ./bootstrap.sh update` (sin `down -v`, sin borrar
+  volúmenes). Baja el código nuevo del backend y del TTS, reusa
+  `config/install.conf` y reconstruye solo los servicios instalados; no toca
+  `config/.env`, `tts/.env`, `data/` ni `logs/`.
 - No hay volúmenes nombrados de Docker con estado: `data/`, `logs/` y `tts/data/`
   son bind mounts dentro del directorio de instalación (dueño `10001`). El backup
   es un `tar` de esa carpeta y mover el stack es mover la carpeta completa; si se

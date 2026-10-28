@@ -253,13 +253,23 @@ def test_bootstrap_script_fetches_the_repository() -> None:
     assert "codeload.github.com" in text, "bootstrap.sh baja el tarball"
     assert "--dir" in text, "sudo limpia el entorno: el destino va por argumento"
     assert 'DEST="$(pwd)"' in text, "sin --dir instala en el directorio actual, como AzuraCast"
-    assert "install) ;;" in text, "./bootstrap.sh install es el flujo documentado"
+    assert 'install) MODE="install" ;;' in text, "./bootstrap.sh install es el flujo documentado"
     assert "./install.sh" in text, "bootstrap.sh ejecuta el instalador"
     assert "--exclude=./bootstrap.sh" in text, "no se sobrescribe mientras se ejecuta"
     assert "radio-alertas-tts" in text, "bootstrap.sh baja también la cadena TTS"
     assert "--tts-src" in text, "la cadena TTS se le entrega a install.sh con --tts-src"
     if os.name != "nt":
         assert path.stat().st_mode & 0o111, "bootstrap.sh tiene que ser ejecutable"
+
+
+def test_bootstrap_script_can_update_itself_and_the_install() -> None:
+    text = (ROOT / "bootstrap.sh").read_text(encoding="utf-8")
+
+    assert "update-self)" in text, "falta el subcomando update-self"
+    assert "update)" in text, "falta el subcomando update"
+    assert "RAW_URL" in text, "update-self vuelve a bajar bootstrap.sh"
+    assert 'args+=(--non-interactive)' in text, "update no pregunta: reusa install.conf"
+    assert "$DEST/config/install.conf" in text, "update respeta los servicios instalados"
 
 
 def test_acme_helpers_are_present() -> None:
