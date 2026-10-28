@@ -300,6 +300,9 @@ def test_installer_pins_the_acme_release_and_names_it_on_failure() -> None:
         "registro, emisión e instalación del certificado tienen que usar el home "
         "de config/acme, igual que el cron de renovación"
     )
+    assert "no pude copiar el certificado a config/certs" in text, (
+        "--install-cert fallando no puede reportarse como instalación correcta"
+    )
 
 
 def test_acme_helpers_are_present() -> None:

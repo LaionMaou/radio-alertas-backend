@@ -758,11 +758,16 @@ issue_certificate() {
     fi
     unset CF_Token
 
-    "$ACME_BIN" --install-cert -d "$DOMAIN" --ecc \
+    if ! "$ACME_BIN" --install-cert -d "$DOMAIN" --ecc \
         --home "$ACME_HOME" --config-home "$ACME_HOME" \
         --fullchain-file "$CERTS_DIR/fullchain.pem" \
         --key-file "$CERTS_DIR/key.pem" \
-        --reloadcmd "$BASE_DIR/deploy/acme-reload.sh" >/dev/null
+        --reloadcmd "$BASE_DIR/deploy/acme-reload.sh" >/dev/null; then
+        die "no pude copiar el certificado a config/certs; revisá config/acme/home"
+    fi
+    for f in "$CERTS_DIR/fullchain.pem" "$CERTS_DIR/key.pem"; do
+        [ -s "$f" ] || die "el certificado quedó vacío en $f"
+    done
     chmod 644 "$CERTS_DIR/fullchain.pem"
     chmod 600 "$CERTS_DIR/key.pem"
     ok "certificado instalado en config/certs"
