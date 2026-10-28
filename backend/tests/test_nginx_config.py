@@ -280,6 +280,15 @@ def test_bootstrap_script_can_update_itself_and_the_install() -> None:
     assert "$DEST/config/install.conf" in text, "update respeta los servicios instalados"
 
 
+def test_installer_pins_the_acme_release_and_names_it_on_failure() -> None:
+    text = (ROOT / "install.sh").read_text(encoding="utf-8")
+
+    assert "acme.sh/archive/refs/tags/" in text, "acme.sh se fija por tag, no por master"
+    assert "no pude descargar acme.sh: $ACME_URL" in text, (
+        "si el tag desaparece, el error tiene que mostrar la URL que falló"
+    )
+
+
 def test_acme_helpers_are_present() -> None:
     for name in ("acme-reload.sh", "acme-renew.sh"):
         path = ROOT / "deploy" / name

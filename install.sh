@@ -45,7 +45,7 @@ ACME_CF_ENV="$ACME_DIR/cloudflare.env"
 ACME_GTS_ENV="$ACME_DIR/gts.env"
 ACME_LOG="$BASE_DIR/logs/acme.log"
 CRON_FILE="/etc/cron.d/radio-alertas"
-ACME_URL="https://github.com/acmesh-official/acme.sh/archive/refs/tags/v3.1.4.tar.gz"
+ACME_URL="https://github.com/acmesh-official/acme.sh/archive/refs/tags/v3.1.6.tar.gz"
 LE_SERVER="https://acme-v02.api.letsencrypt.org/directory"
 LE_STAGING="https://acme-staging-v02.api.letsencrypt.org/directory"
 GTS_SERVER="https://dv.acme-v02.api.pki.goog/directory"
@@ -702,7 +702,7 @@ ensure_acme() {
     tmp="$(mktemp -d)"
     if ! curl -fsSL "$ACME_URL" -o "$tmp/acme.tar.gz"; then
         rm -rf "$tmp"
-        die "no pude descargar acme.sh desde GitHub"
+        die "no pude descargar acme.sh: $ACME_URL"
     fi
     if ! tar -xzf "$tmp/acme.tar.gz" -C "$tmp" --strip-components=1; then
         rm -rf "$tmp"
