@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Arranque de una línea: baja este repo y ejecuta install.sh con los mismos
-# argumentos. Pensado para correr sin clonar nada:
+# Arranque de una línea: baja este repo (y la cadena TTS si los servicios la
+# incluyen) y ejecuta install.sh con los mismos argumentos. Pensado para correr
+# sin clonar nada:
 #   curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh \
 #     | sudo bash -s -- --dir /var/alertas --services all --domain alertas.ejemplo.com ...
 # Sin TTY no hay asistente: pasá las opciones o dejá config/install.conf.
@@ -8,6 +9,8 @@ set -euo pipefail
 
 REPO_OWNER="LaionMaou"
 REPO_NAME="radio-alertas-backend"
+TTS_OWNER="LaionMaou"
+TTS_NAME="radio-alertas-tts"
 DEST="/var/alertas"
 BRANCH="main"
 
@@ -22,6 +25,10 @@ Uso: curl -fsSL .../bootstrap.sh | sudo bash -s -- [opciones] [opciones de insta
   -h, --help        esta ayuda
 
 Todo lo demás se le pasa a install.sh (--services, --domain, --port, --tls...).
+
+La cadena TTS se baja sola de LaionMaou/radio-alertas-tts cuando los servicios
+la incluyen (all por defecto). Con --tts-src RUTA se usa esa copia y no se
+descarga nada; con --no-tts no se instala.
 EOF
 }
 
@@ -45,6 +52,27 @@ case "$DEST" in
     *) die "--dir tiene que ser una ruta absoluta: $DEST" ;;
 esac
 
+# La cadena TTS vive en otro repo. Si install.sh la va a instalar y no se pasó
+# una copia local, se baja acá y se le entrega con --tts-src.
+services="all"
+want_tts=1
+i=0
+while [ "$i" -lt "${#args[@]}" ]; do
+    case "${args[$i]}" in
+        --services)
+            services="${args[$((i + 1))]:-all}"
+            i=$((i + 1)) ;;
+        --services=*) services="${args[$i]#--services=}" ;;
+        --no-tts|--tts-src|--tts-src=*) want_tts=0 ;;
+    esac
+    i=$((i + 1))
+done
+
+case ",$services," in
+    *",all,"*|*",tts,"*) ;;
+    *) want_tts=0 ;;
+esac
+
 [ "$(id -u)" -eq 0 ] || die "ejecutá con sudo: curl ... | sudo bash -s -- ..."
 command -v curl >/dev/null 2>&1 || die "falta curl"
 command -v tar >/dev/null 2>&1 || die "falta tar"
@@ -66,6 +94,17 @@ tar -xzf "$tmp/repo.tar.gz" -C "$tmp/src" --strip-components=1 \
 tar -C "$tmp/src" -cf - . | tar -C "$DEST" -xf -
 chmod +x "$DEST/install.sh" "$DEST"/deploy/*.sh 2>/dev/null || true
 
+if [ "$want_tts" -eq 1 ]; then
+    tts_url="https://codeload.github.com/$TTS_OWNER/$TTS_NAME/tar.gz/refs/heads/main"
+    printf 'bootstrap: bajando %s (main)\n' "$TTS_NAME" >&2
+    mkdir -p "$tmp/tts"
+    curl -fsSL "$tts_url" -o "$tmp/tts.tar.gz" \
+        || die "no pude descargar $tts_url; usá --tts-src RUTA o --no-tts"
+    tar -xzf "$tmp/tts.tar.gz" -C "$tmp/tts" --strip-components=1 \
+        || die "el tarball del TTS no se pudo extraer"
+    args+=(--tts-src "$tmp/tts")
+fi
+
 printf 'bootstrap: proyecto en %s\n' "$DEST" >&2
 cd "$DEST"
-exec ./install.sh "${args[@]}"
+./install.sh "${args[@]}"

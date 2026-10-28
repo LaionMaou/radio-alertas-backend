@@ -106,6 +106,11 @@ El proyecto puede vivir en cualquier ruta absoluta: `--dir` cambia el destino
 rama. Los datos quedan dentro de esa misma carpeta (`data/`, `logs/`, `tts/data`),
 así que moverla mueve todo.
 
+Cuando los servicios incluyen la cadena TTS (`all` por defecto), `bootstrap.sh`
+baja también `LaionMaou/radio-alertas-tts` y se la entrega al instalador, así que
+no hay que clonar nada más. Con `--tts-src RUTA` usa esa copia local y con
+`--no-tts` no la instala.
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/main/bootstrap.sh | sudo bash -s -- --dir /srv/alertas --services backend,web
 ```

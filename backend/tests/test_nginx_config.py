@@ -252,7 +252,9 @@ def test_bootstrap_script_fetches_the_repository() -> None:
     text = path.read_text(encoding="utf-8")
     assert "codeload.github.com" in text, "bootstrap.sh baja el tarball"
     assert "--dir" in text, "sudo limpia el entorno: el destino va por argumento"
-    assert 'exec ./install.sh "${args[@]}"' in text, "bootstrap.sh pasa los argumentos"
+    assert './install.sh "${args[@]}"' in text, "bootstrap.sh pasa los argumentos"
+    assert "radio-alertas-tts" in text, "bootstrap.sh baja también la cadena TTS"
+    assert "--tts-src" in text, "la cadena TTS se le entrega a install.sh con --tts-src"
     if os.name != "nt":
         assert path.stat().st_mode & 0o111, "bootstrap.sh tiene que ser ejecutable"
 

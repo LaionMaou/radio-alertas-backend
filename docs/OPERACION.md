@@ -33,6 +33,10 @@ curl -fsSL https://raw.githubusercontent.com/LaionMaou/radio-alertas-backend/mai
     --tls letsencrypt --acme-email ops@ejemplo.com --cf-token-file /root/cf-token.env
 ```
 
+Si los servicios incluyen la cadena TTS (`all` por defecto), el bootstrap baja
+también `LaionMaou/radio-alertas-tts` y la pasa como `--tts-src`; con `--tts-src
+RUTA` usa esa copia local y con `--no-tts` no instala la cadena.
+
 Con el proyecto ya subido al VPS:
 
 ```bash
