@@ -230,6 +230,14 @@ def test_installer_exposes_the_new_options() -> None:
         assert flag in text, f"falta {flag} en install.sh"
 
 
+def test_installer_explains_that_the_cf_flag_takes_a_path() -> None:
+    text = (ROOT / "install.sh").read_text(encoding="utf-8")
+
+    assert "--cf-token-file espera la RUTA" in text, (
+        "si se pega el token en lugar de la ruta, el error tiene que decirlo"
+    )
+
+
 def test_installer_can_leave_the_staging_ca() -> None:
     text = (ROOT / "install.sh").read_text(encoding="utf-8")
 

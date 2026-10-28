@@ -651,7 +651,14 @@ fi
 
 prepare_cf_credentials() {
     if [ -n "$FLAG_CF_FILE" ]; then
-        [ -r "$FLAG_CF_FILE" ] || die "no puedo leer $FLAG_CF_FILE"
+        if [ ! -r "$FLAG_CF_FILE" ]; then
+            # Un token pegado por error no se imprime: quedaría en el log y en
+            # el historial de la terminal.
+            case "$FLAG_CF_FILE" in
+                */*) die "no puedo leer $FLAG_CF_FILE" ;;
+                *) die "--cf-token-file espera la RUTA de un archivo con CF_Token=..., no el token; guardalo en /root/cf-token.env" ;;
+            esac
+        fi
         local token
         token="$(awk 'NF { sub(/^CF_Token=/, ""); print; exit }' "$FLAG_CF_FILE" \
             | tr -d '\r' \

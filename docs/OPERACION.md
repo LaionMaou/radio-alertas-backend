@@ -295,6 +295,7 @@ investigando.
 | `el puerto N está ocupado` al instalar | otro servicio lo tomó | elegir otro con `sudo ./install.sh --port 9443` |
 | `502 Bad Gateway` en la web | backend caído o reiniciando | `docker ps`; logs del backend |
 | `nginx: [emerg] cannot load certificate` | `config/certs/` vacío o emisión fallida | revisar `logs/acme.log` y reemitir con `--configure` |
+| `--cf-token-file espera la RUTA de un archivo` | se pasó el token como valor, no como ruta | crear `/root/cf-token.env` con `CF_Token=...` (0600) y pasar esa ruta |
 | La emisión ACME falla con el dominio | el subdominio no está en la zona del token | token de la zona correcta, o `--tls letsencrypt` |
 | El certificado no se renueva | token revocado o DNS movido de proveedor | `tail -50 logs/acme.log`; `config/acme/home/acme.sh --list` |
 
