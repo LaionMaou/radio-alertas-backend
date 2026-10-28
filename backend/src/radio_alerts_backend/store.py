@@ -183,6 +183,16 @@ class EventStore:
             await self._publish(event)
             return event
 
+    async def clear_loops(self) -> int:
+        keys = [
+            key
+            for key, event in list(self._events.items())
+            if event.tts.get("loop_active")
+        ]
+        for key in keys:
+            await self.update_tts(key, {"loop_active": False})
+        return len(keys)
+
     async def record_announcement(
         self,
         event_key: str,

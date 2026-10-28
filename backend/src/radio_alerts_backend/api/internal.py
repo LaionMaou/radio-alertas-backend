@@ -106,6 +106,32 @@ async def trigger_tts(payload: TriggerIn, request: Request) -> dict[str, object]
     }
 
 
+@router.post("/stop-tts")
+async def stop_tts(request: Request) -> dict[str, object]:
+    service = services(request)
+    result = await service.tts.stop()
+    if result.get("error"):
+        logger.error(
+            "internal.stop_tts_failed", extra={"error": str(result.get("error"))}
+        )
+        raise HTTPException(status_code=502, detail="La cadena TTS no confirmó el corte")
+
+    cleared = await service.store.clear_loops()
+    logger.info(
+        "internal.stop_tts",
+        extra={
+            "stopped": bool(result.get("stopped")),
+            "status": result.get("status"),
+            "cleared": cleared,
+        },
+    )
+    return {
+        "stopped": bool(result.get("stopped")),
+        "status": result.get("status"),
+        "cleared": cleared,
+    }
+
+
 @router.post("/simulate")
 async def simulate(body: SimulateIn, request: Request) -> dict[str, object]:
     service = services(request)

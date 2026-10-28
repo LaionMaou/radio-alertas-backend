@@ -174,6 +174,135 @@ async def test_major_tsunami_payload_asks_for_urgent_loop_and_preempt(tmp_path) 
     assert payload["preempt"] is True
 
 
+async def test_loop_submission_marks_loop_active_and_result_clears_it(tmp_path) -> None:
+    item = event(event_key="tsunami:1", kind=EventKind.TSUNAMI)
+    store = await make_store(tmp_path, item)
+    recorder = Recorder(
+        {
+            ("POST", "/alert"): httpx.Response(202, json={"alert_id": "a1", "status": "queued"}),
+            ("GET", "/alert/a1"): httpx.Response(200, json={"status": "stopped", "error": None}),
+        }
+    )
+    client = TtsClient(settings(), store, transport=httpx.MockTransport(recorder))
+
+    await client.submit(item, text="大津波警報。", dedupe_key="k", loop=True)
+    assert store.get(item.event_key).tts["loop_active"] is True
+
+    await client.wait_pending()
+    await client.aclose()
+
+    assert store.get(item.event_key).tts["loop_active"] is False
+
+
+async def test_plain_alert_never_marks_a_loop(tmp_path) -> None:
+    item = event()
+    store = await make_store(tmp_path, item)
+    recorder = Recorder(
+        {
+            ("POST", "/alert"): httpx.Response(202, json={"alert_id": "a1", "status": "queued"}),
+            ("GET", "/alert/a1"): httpx.Response(200, json={"status": "ok", "error": None}),
+        }
+    )
+    client = TtsClient(settings(), store, transport=httpx.MockTransport(recorder))
+
+    await client.submit(item, text="地震情報。", dedupe_key="k")
+    await client.wait_pending()
+    await client.aclose()
+
+    assert store.get(item.event_key).tts["loop_active"] is False
+
+
+async def test_loop_poller_waits_far_longer_than_a_normal_result(tmp_path) -> None:
+    item = event(event_key="tsunami:1", kind=EventKind.TSUNAMI)
+    store = await make_store(tmp_path, item)
+    clock = Clock()
+    recorder = Recorder(
+        {
+            ("POST", "/alert"): httpx.Response(202, json={"alert_id": "a1", "status": "queued"}),
+            ("GET", "/alert/a1"): httpx.Response(404, json={"detail": "missing"}),
+        }
+    )
+    client = TtsClient(
+        settings(tts_result_timeout_seconds=10),
+        store,
+        transport=httpx.MockTransport(recorder),
+        sleep=clock.sleep,
+        clock=clock,
+    )
+
+    await client.submit(item, text="大津波警報。", dedupe_key="k", loop=True)
+    await client.wait_pending()
+    await client.aclose()
+
+    assert clock.delays[0] == 15.0
+    assert clock.now > 180
+    assert store.get(item.event_key).tts["status"] == "unknown"
+
+
+async def test_stop_posts_to_the_tts_chain(tmp_path) -> None:
+    store = EventStore(tmp_path)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/stop"
+        assert request.headers["authorization"] == "Bearer tts-secret"
+        return httpx.Response(200, json={"stopped": True, "status": "stopping"})
+
+    client = TtsClient(settings(), store, transport=httpx.MockTransport(handler))
+    result = await client.stop()
+    await client.aclose()
+
+    assert result == {"stopped": True, "status": "stopping", "error": None}
+
+
+@pytest.mark.parametrize(
+    ("response", "fragment"),
+    [
+        (httpx.Response(401, json={"detail": "no"}), "autenticación rechazada"),
+        (httpx.Response(500, json={"detail": "boom"}), "respuesta inesperada"),
+    ],
+)
+async def test_stop_reports_errors_without_stopping(tmp_path, response, fragment) -> None:
+    client = TtsClient(
+        settings(),
+        EventStore(tmp_path),
+        transport=httpx.MockTransport(lambda request: response),
+    )
+    result = await client.stop()
+    await client.aclose()
+
+    assert result["stopped"] is False
+    assert result["status"] is None
+    assert fragment in result["error"]
+
+
+async def test_stop_survives_a_network_error(tmp_path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("down")
+
+    client = TtsClient(settings(), EventStore(tmp_path), transport=httpx.MockTransport(handler))
+    result = await client.stop()
+    await client.aclose()
+
+    assert result["stopped"] is False
+    assert "ConnectError" in result["error"]
+
+
+async def test_stop_in_dry_run_makes_no_http_calls(tmp_path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no debe haber HTTP en dry-run")
+
+    client = TtsClient(
+        settings(dry_run=True),
+        EventStore(tmp_path),
+        transport=httpx.MockTransport(handler),
+    )
+    result = await client.stop()
+    await client.aclose()
+
+    assert result == {"stopped": False, "status": "idle", "error": None}
+
+
 async def test_duplicate_without_stored_result_keeps_duplicate_status(tmp_path) -> None:
     item = event()
     store = await make_store(tmp_path, item)

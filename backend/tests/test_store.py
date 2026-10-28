@@ -137,6 +137,35 @@ async def test_replay_restores_announcements_and_tts(tmp_path) -> None:
     assert replayed.seq == last_seq
 
 
+async def test_clear_loops_turns_the_flag_off_and_publishes(tmp_path) -> None:
+    bus = EventBus()
+    store = EventStore(tmp_path, bus=bus)
+    looping = await store.upsert(make_event("tsunami:1", kind=EventKind.TSUNAMI))
+    other = await store.upsert(make_event("quake:1"))
+    await store.update_tts(looping.event_key, {"loop_active": True})
+
+    async with bus.subscribe() as subscription:
+        cleared = await store.clear_loops()
+        message = await asyncio.wait_for(subscription.queue.get(), 1)
+
+    assert cleared == 1
+    assert message.data["event_key"] == "tsunami:1"
+    assert message.data["tts"]["loop_active"] is False
+    assert store.get(looping.event_key).tts["loop_active"] is False
+    assert store.get(other.event_key).tts["loop_active"] is False
+
+
+async def test_loop_flag_survives_a_replay(tmp_path) -> None:
+    store = EventStore(tmp_path)
+    event = await store.upsert(make_event("tsunami:1", kind=EventKind.TSUNAMI))
+    await store.update_tts(event.event_key, {"status": "queued", "loop_active": True})
+
+    replayed = EventStore(tmp_path)
+    await replayed.load()
+
+    assert replayed.get(event.event_key).tts["loop_active"] is True
+
+
 async def test_find_related_eew_uses_time_and_distance(tmp_path) -> None:
     store = EventStore(tmp_path)
     now = utcnow()

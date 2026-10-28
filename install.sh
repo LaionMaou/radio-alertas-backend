@@ -161,6 +161,22 @@ env_set() {
     rm -f "$tmp"
 }
 
+# Reemplaza un placeholder de una plantilla sin interpretar nada del valor:
+# el token puede traer &, |, / o \ y con sed o con ${var//pat/repl} se rompería.
+subst() {
+    KEY="$1" VALUE="$2" awk '
+        BEGIN { k = ENVIRON["KEY"]; v = ENVIRON["VALUE"] }
+        {
+            line = $0; out = ""
+            while ((i = index(line, k)) > 0) {
+                out = out substr(line, 1, i - 1) v
+                line = substr(line, i + length(k))
+            }
+            print out line
+        }
+    '
+}
+
 is_placeholder() {
     case "$1" in
         ""|cambiar-*|changeme*) return 0 ;;
@@ -814,14 +830,33 @@ if [ "$WEB" -eq 1 ]; then
     cp "$NGINX_SRC_DIR/snippets/"*.inc "$NGINX_RENDERED_DIR/snippets/"
     chmod 644 "$NGINX_RENDERED_DIR/snippets/"*.inc
 
-    if [ "$SCHEME" = "https" ]; then
-        sed "s|__DOMAIN__|$DOMAIN|g" "$NGINX_SRC_DIR/radio-alerts-tls.conf" \
-            > "$NGINX_RENDERED_DIR/site.conf"
-    else
-        sed "s|^    server_name _;|    server_name ${DOMAIN:-_};|" \
-            "$NGINX_SRC_DIR/radio-alerts.conf" > "$NGINX_RENDERED_DIR/site.conf"
+    # nginx inyecta este token en el proxy de /api/stop; sin él el botón no
+    # funciona, así que se genera también cuando la instalación es solo web.
+    if [ ! -f "$BACKEND_ENV" ]; then
+        cp "$BACKEND_ENV_EXAMPLE" "$BACKEND_ENV"
+        chmod 600 "$BACKEND_ENV"
     fi
-    chmod 644 "$NGINX_RENDERED_DIR/site.conf"
+    ensure_secret "$BACKEND_ENV" INTERNAL_TOKEN
+    internal_token="$(env_get "$BACKEND_ENV" INTERNAL_TOKEN)"
+    [ -n "$internal_token" ] || die "config/.env no tiene INTERNAL_TOKEN; no puedo armar el portal"
+    case "$internal_token" in
+        *\"*) die "INTERNAL_TOKEN tiene comillas; en config/.env usá uno sin comillas" ;;
+    esac
+
+    if [ "$SCHEME" = "https" ]; then
+        site_template="$NGINX_SRC_DIR/radio-alerts-tls.conf"
+        subst __INTERNAL_TOKEN__ "$internal_token" < "$site_template" \
+            | subst __DOMAIN__ "$DOMAIN" > "$NGINX_RENDERED_DIR/site.conf"
+    else
+        subst __INTERNAL_TOKEN__ "$internal_token" < "$NGINX_SRC_DIR/radio-alerts.conf" \
+            | subst '    server_name _;' "    server_name ${DOMAIN:-_};" \
+            > "$NGINX_RENDERED_DIR/site.conf"
+    fi
+    chmod 600 "$NGINX_RENDERED_DIR/site.conf"
+
+    # nginx lo abre por request: vacío permite arrancar, pero nadie entra.
+    touch "$NGINX_RENDERED_DIR/operator.htpasswd"
+    chmod 644 "$NGINX_RENDERED_DIR/operator.htpasswd"
     ok "configuración de nginx generada para ${SCHEME}://${DOMAIN:-_}"
 
     if [ "$SCHEME" = "https" ]; then
@@ -956,6 +991,15 @@ if [ "$WEB" -eq 1 ]; then
         warn "nginx devolvió $internal_code en /internal/trigger-tts; debería ser 404"
     fi
 
+    stop_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -X POST \
+        "${check_opts[@]}" "${web_url}api/stop" 2>/dev/null || true)"
+    stop_code="${stop_code:-000}"
+    if [ "$stop_code" = "401" ]; then
+        ok "el botón de stop exige operador (401 sin credenciales)"
+    else
+        warn "POST /api/stop devolvió $stop_code; debería ser 401 sin credenciales"
+    fi
+
     if [ "$SCHEME" = "https" ]; then
         if command -v openssl >/dev/null 2>&1; then
             cert_line="$(openssl x509 -in "$CERTS_DIR/fullchain.pem" -noout -issuer -enddate 2>/dev/null \
@@ -1004,6 +1048,23 @@ else
     backend_status="no instalado"
 fi
 
+operator_step=""
+if [ "$WEB" -eq 1 ]; then
+    operator_step="  4. Operadores del portal (botón de stop de 大津波警報):
+       sudo ./deploy/operators.sh add <usuario>"
+    if [ "$NON_INTERACTIVE" -eq 0 ] && [ -t 0 ] \
+        && ! grep -q ':' "$NGINX_RENDERED_DIR/operator.htpasswd" 2>/dev/null; then
+        printf '\nEl botón de stop del portal pide usuario y contraseña por operador.\n'
+        if [ "$(ask '¿Crear el primer operador ahora? [s/N] ')" = "s" ]; then
+            operator_user="$(ask '  Usuario: ')"
+            if [ -n "$operator_user" ]; then
+                "$BASE_DIR/deploy/operators.sh" add "$operator_user" \
+                    || warn "no pude crear el operador; probá de nuevo con deploy/operators.sh"
+            fi
+        fi
+    fi
+fi
+
 cert_block=""
 if [ "$SCHEME" = "https" ]; then
     cert_block="  Certificado          ${cert_line:-ver config/certs}
@@ -1038,6 +1099,7 @@ Siguientes pasos
          -d '{"fixture":"eew"}'
      (requiere ENABLE_SIMULATE=true y recrear el backend)
   3. Paso a audio real: docs/OPERACION.md, sección 6, solo con autorización.
+$operator_step
 EOF
 
 if [ "$FAILURES" -ne 0 ]; then

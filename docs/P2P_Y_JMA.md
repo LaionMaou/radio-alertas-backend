@@ -120,7 +120,11 @@ intensidad, se omite esa cláusula.
 
 Una `MajorWarning` no se anuncia una vez: **corta lo que esté sonando y repite el
 texto hasta que un operador lo detenga** (o llegue otra alerta, que lo reemplaza).
-El comando de stop está en el README del TTS.
+El operador lo corta desde el portal (botón que solo aparece mientras el bucle
+suena, ver `docs/OPERACION.md` §3.1); sin portal, el comando de stop está en el
+README del TTS. El backend marca `tts.loop_active` al aceptar el bucle y lo
+limpia con el corte o con el resultado final, así que el portal sabe cuándo
+mostrar el botón incluso después de un reinicio.
 
 ### Gravedad enviada al TTS
 

@@ -161,6 +161,106 @@ main {
   min-height: 220px;
 }
 
+.stopbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px clamp(16px, 3vw, 24px);
+  border: 1px solid #e53935;
+  border-radius: var(--radius);
+  background: var(--kind-tsunami-major);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+
+.stopbar-text {
+  flex: 1 1 320px;
+  min-width: 220px;
+}
+
+.stopbar-title {
+  margin: 0;
+  font-size: clamp(1.05rem, 2.4vw, 1.3rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.stopbar-note {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: rgb(255 255 255 / 0.86);
+}
+
+.stopbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.stopbar-button {
+  min-height: 48px;
+  padding: 10px 22px;
+  border: 2px solid #fff;
+  border-radius: 10px;
+  background: #fff;
+  color: #8e1414;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stopbar-button:hover {
+  background: #ffe9e9;
+}
+
+.stopbar-button[data-phase="confirm"] {
+  background: #ffd34d;
+  border-color: #ffd34d;
+  color: #3a2500;
+}
+
+.stopbar-button:disabled {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.stopbar-cancel {
+  min-height: 48px;
+  padding: 10px 18px;
+  border: 1px solid rgb(255 255 255 / 0.6);
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stopbar-cancel:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.stopbar-status {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.stopbar-status[data-tone="ok"] {
+  color: #b7f5c4;
+}
+
+.stopbar-status[data-tone="warn"] {
+  color: #ffe6a3;
+}
+
+.stopbar-status[data-tone="bad"] {
+  color: #ffd3d3;
+}
+
 .empty {
   padding: clamp(32px, 6vw, 64px) 24px;
   border: 1px dashed var(--border);
@@ -520,6 +620,28 @@ main {
 
   .link-button {
     margin-left: 0;
+  }
+
+  .stopbar {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  /* En columna, el flex-basis de escritorio se vuelve altura. */
+  .stopbar-text {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .stopbar-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stopbar-button,
+  .stopbar-cancel {
+    width: 100%;
   }
 }
 

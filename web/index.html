@@ -26,6 +26,18 @@
 </header>
 
 <main id="main">
+  <section id="stopbar" class="stopbar" aria-live="polite" hidden>
+    <div class="stopbar-text">
+      <p class="stopbar-title">大津波警報を放送中です</p>
+      <p class="stopbar-note">停止するまで繰り返し放送します。停止すると自動放送に戻ります。</p>
+    </div>
+    <div class="stopbar-actions">
+      <button id="stop-button" class="stopbar-button" type="button">放送を停止</button>
+      <button id="stop-cancel" class="stopbar-cancel" type="button" hidden>取消</button>
+    </div>
+    <p id="stop-status" class="stopbar-status" role="status" hidden></p>
+  </section>
+
   <section class="panel" aria-live="polite">
     <div id="alert-empty" class="empty">
       <p class="empty-title">現在、有効な警報はありません</p>

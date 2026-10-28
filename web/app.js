@@ -80,6 +80,10 @@
     unpin: document.getElementById('unpin'),
     history: document.getElementById('history-list'),
     historyEmpty: document.getElementById('history-empty'),
+    stopbar: document.getElementById('stopbar'),
+    stopButton: document.getElementById('stop-button'),
+    stopCancel: document.getElementById('stop-cancel'),
+    stopStatus: document.getElementById('stop-status'),
   };
 
   const state = {
@@ -90,6 +94,7 @@
     errors: 0,
     pollTimer: null,
     retryTimer: null,
+    stop: { key: null, phase: 'idle', message: '', retryTimer: null },
   };
 
   function formatJst(value, options) {
@@ -343,6 +348,123 @@
     el.unpin.hidden = !pinned;
   }
 
+  const STOP_RETRY_MS = 15000;
+
+  // La barra depende solo de `tts.loop_active`: el store marca `expired` los
+  // eventos viejos aunque el bucle siga sonando, y el locutor puede estar
+  // leyendo un evento anterior mientras el audio repite.
+  function loopAlert() {
+    for (const alert of sortedAlerts()) {
+      if (alert.tts && alert.tts.loop_active === true) {
+        return alert;
+      }
+    }
+    return null;
+  }
+
+  function setStopState(phase, message, tone) {
+    state.stop.phase = phase;
+    state.stop.message = message || '';
+    state.stop.tone = tone || '';
+    renderStopbar();
+  }
+
+  function clearStopRetry() {
+    if (state.stop.retryTimer !== null) {
+      clearTimeout(state.stop.retryTimer);
+      state.stop.retryTimer = null;
+    }
+  }
+
+  function scheduleStopRetry() {
+    clearStopRetry();
+    state.stop.retryTimer = setTimeout(() => {
+      state.stop.retryTimer = null;
+      if (state.stop.phase !== 'done') {
+        return;
+      }
+      setStopState('confirm', '停止の確認が取れませんでした。もう一度お試しください。', 'warn');
+    }, STOP_RETRY_MS);
+  }
+
+  function renderStopbar() {
+    const alert = loopAlert();
+    if (!alert) {
+      clearStopRetry();
+      state.stop.key = null;
+      state.stop.phase = 'idle';
+      state.stop.message = '';
+      state.stop.tone = '';
+      el.stopbar.hidden = true;
+      el.stopButton.textContent = '放送を停止';
+      el.stopButton.disabled = false;
+      el.stopButton.dataset.phase = 'idle';
+      el.stopCancel.hidden = true;
+      el.stopCancel.disabled = false;
+      el.stopStatus.hidden = true;
+      el.stopStatus.textContent = '';
+      return;
+    }
+
+    if (state.stop.key !== alert.event_key) {
+      clearStopRetry();
+      state.stop.key = alert.event_key;
+      state.stop.phase = 'idle';
+      state.stop.message = '';
+      state.stop.tone = '';
+    }
+
+    const phase = state.stop.phase;
+    el.stopbar.hidden = false;
+    el.stopButton.dataset.phase = phase;
+    el.stopButton.textContent = phase === 'confirm' ? '本当に停止しますか？' : '放送を停止';
+    el.stopButton.disabled = phase === 'busy' || phase === 'done';
+    el.stopCancel.hidden = phase !== 'confirm';
+    el.stopCancel.disabled = phase === 'busy' || phase === 'done';
+    el.stopStatus.hidden = !state.stop.message;
+    el.stopStatus.textContent = state.stop.message;
+    el.stopStatus.dataset.tone = state.stop.tone || 'warn';
+  }
+
+  async function requestStop() {
+    if (state.stop.phase === 'busy' || state.stop.phase === 'done') {
+      return;
+    }
+    setStopState('busy', '停止を要求しています…', 'warn');
+
+    let response = null;
+    try {
+      response = await fetch('/api/stop', {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+      });
+    } catch (error) {
+      response = null;
+    }
+
+    if (response === null) {
+      setStopState('confirm', 'サーバーに接続できませんでした。もう一度お試しください。', 'bad');
+      return;
+    }
+    if (response.ok) {
+      setStopState('done', '停止しました。自動放送に戻ります。', 'ok');
+      scheduleStopRetry();
+      return;
+    }
+    if (response.status === 401 || response.status === 403) {
+      setStopState('confirm', '認証に失敗しました。ページを再読み込みしてください。', 'bad');
+      return;
+    }
+    setStopState('confirm', '停止できませんでした。もう一度お試しください。', 'bad');
+  }
+
+  function cancelStop() {
+    if (state.stop.phase !== 'confirm') {
+      return;
+    }
+    setStopState('idle', '', '');
+  }
+
   function renderHistory() {
     const list = sortedAlerts().slice(0, HISTORY_LIMIT);
     const activeKey = currentKey();
@@ -426,6 +548,7 @@
 
   function render() {
     renderStatus();
+    renderStopbar();
     renderPanel();
     renderHistory();
   }
@@ -605,6 +728,25 @@
   el.unpin.addEventListener('click', () => {
     state.selected = null;
     render();
+  });
+
+  el.stopButton.addEventListener('click', () => {
+    if (state.stop.phase === 'confirm') {
+      requestStop();
+      return;
+    }
+    if (state.stop.phase !== 'idle') {
+      return;
+    }
+    setStopState('confirm', '', '');
+  });
+
+  el.stopCancel.addEventListener('click', cancelStop);
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      cancelStop();
+    }
   });
 
   tick();

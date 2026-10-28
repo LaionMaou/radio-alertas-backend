@@ -33,6 +33,11 @@ _RESULT_STATUS = {
 
 _RATE_RETRY_DELAYS = (1.0, 2.0, 4.0)
 
+# Un bucle dura como máximo LOOP_MAX_SECONDS (24 h) en la cadena TTS: el poller
+# tiene que esperar más que eso o marcaría `unknown` un bucle todavía en el aire.
+_LOOP_TIMEOUT_SECONDS = 26 * 3600
+_LOOP_POLL_INTERVAL = 15.0
+
 Notifier = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
@@ -115,7 +120,37 @@ class TtsClient:
         if preempt:
             payload["preempt"] = True
         async with self._lock:
-            return await self._submit_locked(event.event_key, payload)
+            return await self._submit_locked(event.event_key, payload, loop)
+
+    async def stop(self) -> dict[str, Any]:
+        if self.settings.dry_run:
+            return {"stopped": False, "status": "idle", "error": None}
+        try:
+            response = await self._client.post("/stop")
+        except httpx.HTTPError as exc:
+            return {
+                "stopped": False,
+                "status": None,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        if response.status_code == 200:
+            data = _json(response)
+            return {
+                "stopped": bool(data.get("stopped")),
+                "status": str(data.get("status") or ""),
+                "error": None,
+            }
+        if response.status_code in (401, 403):
+            return {
+                "stopped": False,
+                "status": None,
+                "error": f"autenticación rechazada ({response.status_code})",
+            }
+        return {
+            "stopped": False,
+            "status": None,
+            "error": f"respuesta inesperada ({response.status_code})",
+        }
 
     def status(self) -> dict[str, Any]:
         return {
@@ -137,7 +172,12 @@ class TtsClient:
         self._tasks.clear()
         await self._client.aclose()
 
-    async def _submit_locked(self, event_key: str, payload: dict[str, Any]) -> SubmitOutcome:
+    async def _submit_locked(
+        self,
+        event_key: str,
+        payload: dict[str, Any],
+        loop: bool,
+    ) -> SubmitOutcome:
         rate_retries = 0
         network_retries = 0
 
@@ -156,15 +196,19 @@ class TtsClient:
                 alert_id = str(data.get("alert_id") or "").strip()
                 if not alert_id:
                     return await self._fail(event_key, "respuesta sin alert_id")
-                await self.store.update_tts(
-                    event_key,
-                    {"status": TtsStatus.QUEUED.value, "alert_id": alert_id, "error": None},
-                )
+                update: dict[str, Any] = {
+                    "status": TtsStatus.QUEUED.value,
+                    "alert_id": alert_id,
+                    "error": None,
+                }
+                if loop:
+                    update["loop_active"] = True
+                await self.store.update_tts(event_key, update)
                 logger.info(
                     "tts.submit",
                     extra={"event_key": event_key, "alert_id": alert_id, "status": "queued"},
                 )
-                self._spawn_wait(alert_id, event_key)
+                self._spawn_wait(alert_id, event_key, loop)
                 return SubmitOutcome(status=TtsStatus.QUEUED, alert_id=alert_id)
 
             if response.status_code == 200:
@@ -189,7 +233,7 @@ class TtsClient:
                     },
                 )
                 if duplicate:
-                    await self._check_existing(duplicate, event_key)
+                    await self._check_existing(duplicate, event_key, loop)
                 return SubmitOutcome(
                     status=TtsStatus.DUPLICATE,
                     alert_id=duplicate or None,
@@ -220,13 +264,18 @@ class TtsClient:
 
             return await self._fail(event_key, f"respuesta inesperada ({response.status_code})")
 
-    def _spawn_wait(self, alert_id: str, event_key: str) -> None:
-        task = asyncio.create_task(self._wait_for(alert_id, event_key))
+    def _spawn_wait(self, alert_id: str, event_key: str, loop: bool = False) -> None:
+        task = asyncio.create_task(self._wait_for(alert_id, event_key, loop))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    async def _wait_for(self, alert_id: str, event_key: str) -> None:
-        deadline = self._clock() + float(self.settings.tts_result_timeout_seconds)
+    async def _wait_for(self, alert_id: str, event_key: str, loop: bool = False) -> None:
+        if loop:
+            deadline = self._clock() + _LOOP_TIMEOUT_SECONDS
+            interval = max(self._poll_interval, _LOOP_POLL_INTERVAL)
+        else:
+            deadline = self._clock() + float(self.settings.tts_result_timeout_seconds)
+            interval = self._poll_interval
         while self._clock() < deadline:
             try:
                 response = await self._client.get(_alert_path(alert_id))
@@ -235,7 +284,7 @@ class TtsClient:
             if response is not None and response.status_code == 200:
                 await self._apply_result(alert_id, event_key, _json(response))
                 return
-            await self._sleep(self._poll_interval)
+            await self._sleep(interval)
 
         await self.store.update_tts(
             event_key,
@@ -250,13 +299,20 @@ class TtsClient:
             extra={"event_key": event_key, "alert_id": alert_id, "status": "unknown"},
         )
 
-    async def _check_existing(self, alert_id: str, event_key: str) -> None:
+    async def _check_existing(
+        self,
+        alert_id: str,
+        event_key: str,
+        loop: bool = False,
+    ) -> None:
         try:
             response = await self._client.get(_alert_path(alert_id))
         except httpx.HTTPError:
             return
         if response.status_code == 200:
             await self._apply_result(alert_id, event_key, _json(response))
+        elif loop:
+            await self.store.update_tts(event_key, {"loop_active": True})
 
     async def _apply_result(
         self,
@@ -272,6 +328,7 @@ class TtsClient:
                 "status": status.value,
                 "alert_id": alert_id,
                 "error": str(error) if error else None,
+                "loop_active": False,
             },
         )
         logger.info(

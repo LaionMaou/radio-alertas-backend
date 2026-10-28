@@ -138,6 +138,52 @@ def test_nginx_api_is_read_only() -> None:
         assert "deny all" in api
 
 
+def test_nginx_stop_route_is_the_only_public_post() -> None:
+    for text in _variants():
+        blocks = _location_blocks(text)
+        stop = blocks["/api/stop"]
+
+        assert "auth_basic " in stop, "el stop no puede quedar abierto a internet"
+        assert (
+            "auth_basic_user_file /etc/nginx/conf.d/operator.htpasswd;" in stop
+        ), "cada locutor entra con su propia cuenta"
+        assert "limit_except POST" in stop
+        assert "deny all" in stop
+        assert "proxy_pass http://$backend/internal/stop-tts;" in stop
+        assert 'proxy_set_header Authorization "Bearer $internal_token";' in stop
+
+        assert "set $internal_token \"__INTERNAL_TOKEN__\";" in text
+        assert "limit_except GET" in blocks["/api/"], "el resto de /api/ sigue solo GET"
+
+
+def test_installer_renders_the_internal_token_and_the_operator_file() -> None:
+    text = (ROOT / "install.sh").read_text(encoding="utf-8")
+
+    assert "subst __INTERNAL_TOKEN__" in text, "el sitio tiene que recibir el token real"
+    assert "ensure_secret \"$BACKEND_ENV\" INTERNAL_TOKEN" in text
+    assert "operator.htpasswd" in text, "nginx no arranca sin el archivo de operadores"
+    assert "chmod 600 \"$NGINX_RENDERED_DIR/site.conf\"" in text, (
+        "site.conf contiene el token interno"
+    )
+    assert "api/stop" in text and "401" in text, (
+        "la instalación tiene que verificar que el stop exige credenciales"
+    )
+
+
+def test_operators_script_manages_accounts_per_announcer() -> None:
+    path = ROOT / "deploy" / "operators.sh"
+    assert path.is_file(), "falta deploy/operators.sh"
+    text = path.read_text(encoding="utf-8")
+
+    for command in ("add)", "remove)", "list)"):
+        assert command in text, f"falta el subcomando {command[:-1]}"
+    assert "openssl passwd -apr1" in text, "se usa apr1 para no depender de apache2-utils"
+    assert "read -rs" in text, "la contraseña no se escribe en pantalla"
+    assert "nginx -s reload" in text, "nginx relee el htpasswd por petición, pero hay que recargar"
+    if os.name != "nt":
+        assert path.stat().st_mode & 0o111, "deploy/operators.sh tiene que ser ejecutable"
+
+
 def test_nginx_csp_forbids_inline_code() -> None:
     text = SECURITY_HEADERS.read_text(encoding="utf-8")
 

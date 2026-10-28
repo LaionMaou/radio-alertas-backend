@@ -75,7 +75,10 @@ las opciones o tener ya un `install.conf`.
    Estos pasos solo corren para los servicios que se instalan.
 6. Si hay web, renderiza `config/nginx/site.conf` desde `deploy/nginx`, lo valida
    con `nginx -t` en un contenedor efímero y, con HTTPS, emite el certificado
-   antes de levantar nada (sección 1.1).
+   antes de levantar nada (sección 1.1). El token interno queda dentro de
+   `site.conf` (0600) para el botón de stop, y se crea
+   `config/nginx/operator.htpasswd` vacío: nadie puede cortar la alerta hasta
+   que se dé de alta un operador (sección 3.1).
 7. Construye y levanta **solo los servicios elegidos** y espera el `healthy` de
    cada contenedor. Los que se hayan deseleccionado quedan detenidos.
 8. Verifica `/health`, que nginx devuelva 404 en `/internal/*` sobre el esquema y
@@ -208,6 +211,8 @@ Esperado:
   `degraded` al arrancar mientras P2P conecta es normal durante unos segundos.
 - `latest`: `{"alert":null}` si no hubo eventos todavía.
 - `/internal/*`: **404**. Si devuelve otra cosa, nginx no está aplicando la config.
+- `POST /api/stop` sin credenciales: **401**. Es el único POST público y exige
+  la cuenta de un operador (sección 3.1).
 - El certificado muestra el emisor de la CA elegida y un `notAfter` a ~90 días.
 
 Abrir `http://IP-DEL-VPS:8081/` (o `https://alertas.ejemplo.com:8443/`): la
@@ -222,6 +227,34 @@ docker compose -f deploy/docker-compose.yml logs -f --tail=100 backend
 docker compose -f deploy/docker-compose.yml logs -f --tail=50 web
 tail -f logs/backend.log     # rotación 10 MB × 3
 ```
+
+### 3.1 Operadores y botón de stop
+
+Una 大津波警報 (`MajorWarning`) se repite hasta que alguien la corta. El portal
+tiene el botón para hacerlo sin abrir un SSH: el locutor lee la alerta completa,
+pulsa **放送を停止**, confirma con **本当に停止しますか？** y el AutoDJ retoma.
+
+- La barra roja aparece **solo** mientras `tts.loop_active` sea `true`; no es un
+  pop-up: se suma arriba de la tarjeta y el detalle de la alerta sigue completo.
+- El primer clic pide la cuenta del navegador (basic auth). Si se cancela o se
+  equivoca, `取消` o `Escape` vuelven atrás sin cortar nada.
+- Si la cadena TTS no confirma el corte, el portal responde 502 y la barra
+  **sigue visible** con el mensaje de reintento: nunca se oculta una alerta que
+  puede seguir sonando.
+
+Las cuentas son por locutor, para poder dar de baja a una persona sin tocar al
+resto. La contraseña se escribe a mano (no se imprime ni queda en el historial)
+y se guarda como hash apr1 en `config/nginx/operator.htpasswd` (0644).
+
+```bash
+sudo ./deploy/operators.sh add nombre       # pide la contraseña dos veces
+sudo ./deploy/operators.sh list             # usuarios, nunca los hashes
+sudo ./deploy/operators.sh remove nombre    # baja individual
+```
+
+Cada cambio valida y recarga el contenedor web. Sin operadores el archivo queda
+vacío y el botón responde 401 a todo el mundo; nginx arranca igual. El stop por
+SSH del README del TTS sigue disponible como respaldo si el portal no carga.
 
 ## 4. Simulacro (sin audio)
 
@@ -294,6 +327,10 @@ investigando.
 | `/internal` responde 200 por el puerto web | config de nginx no montada | `docker compose ... exec web nginx -T \| grep internal` |
 | `el puerto N está ocupado` al instalar | otro servicio lo tomó | elegir otro con `sudo ./install.sh --port 9443` |
 | `502 Bad Gateway` en la web | backend caído o reiniciando | `docker ps`; logs del backend |
+| La barra de stop no aparece con una 大津波警報 sonando | el evento no tiene `tts.loop_active` | ver `tts.status` y `logs/backend.log`; el stop por SSH sigue disponible |
+| `POST /api/stop` da 401 con la contraseña correcta | la cuenta no está en `operator.htpasswd` o perdió el 0644 | `./deploy/operators.sh list` y `ls -l config/nginx/operator.htpasswd` |
+| El stop responde 502 | la cadena TTS no confirmó `/stop` | logs del TTS; reintentar desde el portal |
+| La barra sigue visible después de `停止しました` | el SSE se cayó y no llegó el flag | recargar la página; el portal ofrece reintentar a los 15 s |
 | `nginx: [emerg] cannot load certificate` | `config/certs/` vacío o emisión fallida | revisar `logs/acme.log` y reemitir con `--configure` |
 | `--cf-token-file espera la RUTA de un archivo` | se pasó el token como valor, no como ruta | crear `/root/cf-token.env` con `CF_Token=...` (0600) y pasar esa ruta |
 | La emisión ACME falla con el dominio | el subdominio no está en la zona del token | token de la zona correcta, o `--tls letsencrypt` |
@@ -328,7 +365,8 @@ docker compose -f deploy/docker-compose.yml exec backend python scripts/healthch
 
 - **Una sola** conexión WebSocket a P2P. No escalar horizontalmente sin rediseñar.
 - JMA como mínimo 300 s entre peticiones a la misma URL.
-- `POST /internal/*` nunca se publica en nginx.
+- `POST /internal/*` nunca se publica en nginx. El único POST público es
+  `/api/stop`, detrás de la cuenta de un operador.
 - Los puertos 80 y 443 son de AzuraCast: no se publican y no se activa HSTS, que
   rompería el 443 de la radio.
 - No reiniciar el daemon de Docker ni el contenedor de AzuraCast como parte de un

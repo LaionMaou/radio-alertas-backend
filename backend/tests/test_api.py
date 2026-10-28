@@ -163,6 +163,81 @@ async def test_trigger_existing_event_uses_rendered_text(tmp_path) -> None:
     assert stored.tts["status"] == "dry-run"
 
 
+async def test_stop_tts_requires_the_internal_token(tmp_path) -> None:
+    app = make_app(tmp_path)
+    async with client_for(app) as (client, _):
+        unnamed = await client.post("/internal/stop-tts")
+        wrong = await client.post(
+            "/internal/stop-tts", headers={"Authorization": "Bearer nope"}
+        )
+
+    assert unnamed.status_code == 401
+    assert wrong.status_code == 401
+
+
+async def test_stop_tts_clears_the_loop_and_publishes(tmp_path) -> None:
+    app = make_app(tmp_path)
+    async with client_for(app) as (client, services):
+        item = await services.store.upsert(
+            Event(
+                event_key="tsunami:1",
+                kind=EventKind.TSUNAMI,
+                issued_at=ISSUED,
+                title="大津波警報",
+            )
+        )
+        await services.store.update_tts(item.event_key, {"loop_active": True})
+
+        async def fake_stop() -> dict[str, Any]:
+            return {"stopped": True, "status": "stopping", "error": None}
+
+        services.tts.stop = fake_stop  # type: ignore[method-assign]
+        async with services.bus.subscribe() as subscription:
+            response = await client.post("/internal/stop-tts", headers=AUTH)
+            message = await asyncio.wait_for(subscription.queue.get(), 2)
+        stored = services.store.get(item.event_key)
+
+    assert response.status_code == 200
+    assert response.json() == {"stopped": True, "status": "stopping", "cleared": 1}
+    assert message.data["tts"]["loop_active"] is False
+    assert stored is not None
+    assert stored.tts["loop_active"] is False
+
+
+async def test_stop_tts_keeps_the_loop_when_the_chain_fails(tmp_path) -> None:
+    app = make_app(tmp_path)
+    async with client_for(app) as (client, services):
+        item = await services.store.upsert(
+            Event(
+                event_key="tsunami:1",
+                kind=EventKind.TSUNAMI,
+                issued_at=ISSUED,
+                title="大津波警報",
+            )
+        )
+        await services.store.update_tts(item.event_key, {"loop_active": True})
+
+        async def failing_stop() -> dict[str, Any]:
+            return {"stopped": False, "status": None, "error": "ConnectError: down"}
+
+        services.tts.stop = failing_stop  # type: ignore[method-assign]
+        response = await client.post("/internal/stop-tts", headers=AUTH)
+        stored = services.store.get(item.event_key)
+
+    assert response.status_code == 502
+    assert stored is not None
+    assert stored.tts["loop_active"] is True
+
+
+async def test_stop_tts_in_dry_run_is_idle_and_clears_nothing(tmp_path) -> None:
+    app = make_app(tmp_path)
+    async with client_for(app) as (client, _):
+        response = await client.post("/internal/stop-tts", headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.json() == {"stopped": False, "status": "idle", "cleared": 0}
+
+
 async def test_simulate_is_hidden_by_default(tmp_path) -> None:
     app = make_app(tmp_path)
     async with client_for(app) as (client, _):

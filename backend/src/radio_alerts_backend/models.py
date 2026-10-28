@@ -52,6 +52,7 @@ def default_tts() -> dict[str, Any]:
         "alert_id": None,
         "error": None,
         "updated_at": None,
+        "loop_active": False,
     }
 
 
@@ -149,7 +150,7 @@ class Event:
             eew=_dict_or_none(data.get("eew")),
             typhoon=_dict_or_none(data.get("typhoon")),
             enrichment=_dict_or_none(data.get("enrichment")),
-            tts=_dict_or_none(data.get("tts")) or default_tts(),
+            tts={**default_tts(), **(_dict_or_none(data.get("tts")) or {})},
             announcements=[
                 dict(item)
                 for item in (data.get("announcements") or [])
