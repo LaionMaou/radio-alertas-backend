@@ -35,8 +35,8 @@ has_arg() {
 # un archivo nuevo y se renombra, así bash termina de leer el original.
 update_self() {
     [ -f "$0" ] || die "update-self necesita ./bootstrap.sh, no el modo pipeado"
-    local target="$0" new
-    case "$target" in /*) ;; *) target="$PWD/$target" ;; esac
+    local target new
+    target="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
     new="$target.new.$$"
     printf 'bootstrap: actualizando %s (%s)\n' "$target" "$BRANCH" >&2
     curl -fsSL "$RAW_URL" -o "$new" \
